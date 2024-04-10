@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Dom
 import Browser.Events
 import Config exposing (config)
 import FeatherIcons
@@ -8,10 +9,13 @@ import Game exposing (CompletedGame, Game)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Html.Keyed
 import Json.Decode as D
 import List.Extra
 import Maybe.Extra
 import Random
+import Task
+import ThinkingSvg exposing (thinkingSvg)
 
 
 main : Program () Model Msg
@@ -28,7 +32,11 @@ type alias Coords =
 
 
 type alias DragData =
-    { draggedAnswer : Int, draggedOverQuestion : Maybe Int, mouseCoords : Coords }
+    { draggedAnswer : Int
+    , draggedOverQuestion : Maybe Int
+    , mouseCoords : Coords -- The mouse's current position, only tracked and updated if a drag exists
+    , offset : Coords -- The offset between the cursor and the top left corner of the dragged thing, for correct position while dragging
+    }
 
 
 type Model
@@ -56,11 +64,12 @@ coordDecoder =
 
 type Msg
     = NoOp
+    | WithElement String (Browser.Dom.Element -> Msg)
     | HandleAnimationFrameDelta Float
     | HandleStartGameClick
     | HandleAnswerInput Int Game.Answer
     | HandleNextSheetClick
-    | HandleMouseDownAnswer Int Coords
+    | HandleMouseDownAnswer Int Coords Browser.Dom.Element
     | HandleMouseOverQuestion Int
     | HandleMouseOutQuestion Int
     | HandleMouseUpQuestion Int
@@ -132,13 +141,19 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseDownAnswer index coords ->
+        HandleMouseDownAnswer index coords element ->
             case model of
                 GameStarted seed game _ ->
                     let
+                        offset : Coords
+                        offset =
+                            { x = coords.x - element.element.x
+                            , y = coords.y - element.element.y
+                            }
+
                         newDragData : DragData
                         newDragData =
-                            { draggedAnswer = index, draggedOverQuestion = Nothing, mouseCoords = coords }
+                            { draggedAnswer = index, draggedOverQuestion = Nothing, mouseCoords = coords, offset = offset }
                     in
                     ( GameStarted seed game (Just newDragData), Cmd.none )
 
@@ -241,6 +256,18 @@ update msg model =
             in
             ( MainMenu newSeed, Cmd.none )
 
+        WithElement id messageNeedingElement ->
+            let
+                handleGetElementResult : Result Browser.Dom.Error Browser.Dom.Element -> Msg
+                handleGetElementResult res =
+                    res
+                        |> Result.map messageNeedingElement
+                        |> Result.withDefault NoOp
+            in
+            ( model
+            , Task.attempt handleGetElementResult (Browser.Dom.getElement id)
+            )
+
 
 
 -- SUBSCRIPTIONS
@@ -272,9 +299,14 @@ subscriptions model =
 -- VIEW
 
 
+answerId : Int -> String
+answerId index =
+    "answer-" ++ String.fromInt index
+
+
 mainMenuView : Html Msg
 mainMenuView =
-    div [ class "w-full h-full flex flex-col gap-16 items-center" ]
+    div [ class "w-full h-full flex flex-col gap-4 lg:gap-16 items-center" ]
         [ div [ class "prose prose-sm md:prose-base" ]
             [ h1 [ class "flex items-center text-2xl" ]
                 [ span [ class "font-bold" ] [ text "Pretty Good Math" ]
@@ -336,9 +368,23 @@ gameView game maybeDragData =
 
         renderQuestionAnswerPair : Int -> Game.QuestionAnswerPair -> Html Msg
         renderQuestionAnswerPair questionIndex questionAnswer =
+            let
+                rowStyles : Attribute Msg
+                rowStyles =
+                    class "w-full h-14 flex items-center px-8"
+            in
             case questionAnswer of
                 Game.Unanswered question ->
                     let
+                        isDragInProgress : Bool
+                        isDragInProgress =
+                            case maybeDragData of
+                                Nothing ->
+                                    False
+
+                                Just _ ->
+                                    True
+
                         isDraggedOver : Bool
                         isDraggedOver =
                             case maybeDragData of
@@ -348,26 +394,29 @@ gameView game maybeDragData =
                                 Just { draggedOverQuestion } ->
                                     draggedOverQuestion == Just questionIndex
                     in
-                    div
-                        [ class "h-12 flex items-center p-6 gap-2 justify-end border border-dashed border-2 rounded-lg border-primary border-opacity-0"
-                        , classList [ ( "border-opacity-100", isDraggedOver ) ]
+                    li
+                        [ rowStyles
+                        , class "gap-2"
                         , preventDefaultOn "mouseover" (D.succeed ( HandleMouseOverQuestion questionIndex, True ))
                         , preventDefaultOn "mouseout" (D.succeed ( HandleMouseOutQuestion questionIndex, True ))
                         , preventDefaultOn "mouseup" (D.succeed ( HandleMouseUpQuestion questionIndex, True ))
                         ]
-                        [ div [ class "h-12 flex items-center gap-2" ]
+                        [ div
+                            [ class "h-12 flex items-center gap-2 p-4 border border-dashed border-2 rounded-lg border-neutral border-opacity-0"
+                            , classList [ ( "border-primary border-opacity-100", isDraggedOver ), ( "border-neutral border-opacity-50", isDragInProgress && not isDraggedOver ) ]
+                            ]
                             [ renderQuestion questionIndex question
                             , span [] [ text "_____" ]
                             ]
                         ]
 
                 Game.Answered question answer ->
-                    div [ class "h-12 flex items-center gap-6 justify-end" ]
-                        [ div [ class "opacity" ] [ renderScore (Game.scoreQuestion question answer) ]
-                        , div [ class "h-12 flex items-center gap-2 opacity-50" ]
+                    li [ rowStyles, class "gap-4" ]
+                        [ div [ class "h-12 flex items-center gap-2 p-4 opacity-50" ]
                             [ renderQuestion questionIndex question
                             , span [ class "font-bold" ] [ text (String.fromInt answer) ]
                             ]
+                        , div [ class "opacity" ] [ renderScore (Game.scoreQuestion question answer) ]
                         ]
 
         answerDimensionClass : Attribute Msg
@@ -380,27 +429,36 @@ gameView game maybeDragData =
                 mouseDownDecoder : D.Decoder ( Msg, Bool )
                 mouseDownDecoder =
                     coordDecoder
-                        |> D.map (\coords -> ( HandleMouseDownAnswer index coords, True ))
+                        |> D.map
+                            (\coords ->
+                                ( HandleMouseDownAnswer index coords
+                                    |> WithElement (answerId index)
+                                , True
+                                )
+                            )
 
                 dragAttrs : List (Attribute Msg)
                 dragAttrs =
                     case maybeDragData of
                         Nothing ->
-                            [ class "cursor-move" ]
+                            [ class "cursor-move animate-float", style "animation-delay" (String.fromInt (modBy 1000 (index * 200)) ++ "ms") ]
 
-                        Just { draggedAnswer, mouseCoords } ->
+                        Just { draggedAnswer, mouseCoords, offset } ->
                             if draggedAnswer == index then
-                                [ class "fixed shadow-lg"
+                                [ class "fixed shadow-lg z-10"
                                 , style "pointer-events" "none"
-                                , style "top" (String.fromFloat mouseCoords.y ++ "px")
-                                , style "left" (String.fromFloat mouseCoords.x ++ "px")
+                                , style "top" (String.fromFloat (mouseCoords.y - offset.y) ++ "px")
+                                , style "left" (String.fromFloat (mouseCoords.x - offset.x) ++ "px")
                                 ]
 
                             else
-                                []
+                                [ class "animate-float" ]
             in
             -- This extra div is to occupy space while a drag is in progress
-            div [ answerDimensionClass ]
+            div
+                [ answerDimensionClass
+                , id (answerId index)
+                ]
                 [ div
                     ([ answerDimensionClass
                      , class "rounded flex items-center justify-center border border-neutral bg-base-100"
@@ -419,6 +477,41 @@ gameView game maybeDragData =
                     Game.percentTimeLeft game
             in
             progress [ class "progress progress-primary w-56", attribute "value" (String.fromFloat (percentTimeLeft * 100)), attribute "max" "100" ] []
+
+        getOffsetStyles : Int -> List (Attribute Msg)
+        getOffsetStyles index =
+            [ style "top" (String.fromInt (index * 4) ++ "px")
+            , style "left" (String.fromInt (index * 2) ++ "px")
+            ]
+
+        sheetStyles : Attribute Msg
+        sheetStyles =
+            class "w-[350px] h-[440px] bg-base-100 absolute shadow-xl bg-base-100 border border-gray-500"
+
+        placeholderSheet : Int -> Html Msg
+        placeholderSheet index =
+            div
+                ([ sheetStyles
+                 , classList [ ( "hidden", not (index < List.length game.completedSheets + 4) ) ]
+                 ]
+                    ++ getOffsetStyles index
+                )
+                []
+
+        renderCurrentSheet : Html Msg
+        renderCurrentSheet =
+            div ([ sheetStyles, class "flex flex-col items-center gap-6 py-16 animate-slideRotate" ] ++ getOffsetStyles (List.length game.completedSheets))
+                [ div [ class "text-xl font-bold" ] [ text "Question sheet" ]
+                , ul [ class "w-full flex flex-col items-start" ]
+                    (List.indexedMap renderQuestionAnswerPair game.currentSheet)
+                ]
+
+        allSheets : Html Msg
+        allSheets =
+            div [ class "relative" ]
+                (List.indexedMap (\index _ -> placeholderSheet index) game.completedSheets
+                    ++ [ renderCurrentSheet ]
+                )
     in
     div [ class "w-full h-full flex flex-col gap-4" ]
         [ div [ class "flex justify-center items-center gap-8" ]
@@ -427,23 +520,22 @@ gameView game maybeDragData =
             , button [ class "btn btn-sm btn-error", onClick HandleGiveUpClick ] [ text "Give up" ]
             ]
         , div [ class "w-full grid grid-cols-2 gap-4" ]
-            [ -- Question sheet
-              div [ class "flex justify-end" ]
-                [ div [ class "flex flex-col items-center gap-4" ]
-                    [ div [ class "flex flex-col gap-6 shadow-xl p-16" ]
-                        [ div [ class "text-xl font-bold" ] [ text "Question sheet" ]
-                        , ul []
-                            (List.indexedMap renderQuestionAnswerPair game.currentSheet)
-                        ]
-                    , button [ class "btn", classList [ ( "btn-primary", Game.allQuestionsAnswered game ) ], onClick HandleNextSheetClick ] [ text "Next Sheet" ]
+            [ -- Answers
+              div [ class "flex flex-col items-end gap-6 p-4 xl:p-16" ]
+                [ div [ class "text-xl font-bold" ] [ text "Answers" ]
+                , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4" ]
+                    (List.indexedMap renderAnswer game.answers)
+                , div [ class "w-600px max-w-[600px]" ]
+                    [ thinkingSvg
                     ]
                 ]
 
-            -- Answers
-            , div [ class "flex flex-col items-start gap-6 p-16" ]
-                [ div [ class "text-xl font-bold" ] [ text "Answers" ]
-                , ul [ class "flex flex-col items-center gap-4" ]
-                    (List.indexedMap renderAnswer game.answers)
+            -- Questions
+            , div [ class "flex justify-start" ]
+                [ div [ class "flex flex-col items-start gap-4 p-16" ]
+                    [ button [ class "btn", classList [ ( "btn-primary", Game.allQuestionsAnswered game ) ], onClick HandleNextSheetClick ] [ text "Next Sheet" ]
+                    , allSheets
+                    ]
                 ]
             ]
         ]
@@ -458,12 +550,10 @@ gameOverView completedGame =
 
         playerWon : Bool
         playerWon =
-            gameSummary.finalScore
-                >= config.passPoints
-                |> not
+            gameSummary.finalScore >= config.passPoints
     in
-    div [ class "w-full flex justify-center" ]
-        [ div [ class "max-w-3xl shadow-xl rounded flex flex-col gap-16 p-12 items-center overflow-hidden" ]
+    div [ class "w-full flex justify-center", class "animate-fadeInUp" ]
+        [ div [ class "max-w-3xl shadow-xl rounded flex flex-col gap-4 lg:gap-16 p-12 items-center overflow-hidden" ]
             [ div [ class "prose prose-sm md:prose-base" ] [ h1 [] [ text "Results" ] ]
             , div [] [ renderGameSummary gameSummary ]
             , div [ class "prose prose-sm md:prose-base" ]
@@ -572,7 +662,7 @@ view model =
                     False
     in
     div
-        [ class "w-screen h-screen overflow-auto p-16 pb-4"
+        [ class "w-screen h-screen overflow-auto p-4 lg:p-16 pb-4"
         , onMouseUp HandleMouseUpWindow
         , classList [ ( "cursor-none", dragInProgress ) ]
         ]
