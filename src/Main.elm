@@ -308,7 +308,7 @@ mainMenuView =
     div [ class "w-full h-full flex flex-col gap-4 lg:gap-16 items-center" ]
         [ div [ class "prose prose-sm md:prose-base" ]
             [ h1 [ class "flex items-center text-2xl" ]
-                [ span [ class "font-bold" ] [ text "Pretty Good Math" ]
+                [ span [ class "font-bold" ] [ text "Pretty Good Math v2" ]
                 ]
             , p []
                 [ text "Welcome to Pretty Good Math, this is your final exam!"
@@ -663,7 +663,7 @@ view model =
     div
         [ class "w-screen h-screen overflow-auto p-4 lg:p-16 pb-4"
         , onMouseUp HandleMouseUpWindow
-        , on "pointermove" (D.map HandleMouseMove coordDecoder)
+        , preventDefaultOn "pointermove" (D.map (\coords -> ( HandleMouseMove coords, True )) coordDecoder)
         , classList [ ( "cursor-none", dragInProgress ) ]
         ]
         [ case model of
