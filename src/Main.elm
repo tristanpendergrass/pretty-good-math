@@ -290,7 +290,6 @@ subscriptions model =
     in
     Sub.batch
         [ Browser.Events.onAnimationFrameDelta HandleAnimationFrameDelta
-        , Browser.Events.onMouseMove (D.map HandleMouseMove coordDecoder)
         , Browser.Events.onKeyDown keyDownDecoder
         ]
 
@@ -397,9 +396,9 @@ gameView game maybeDragData =
                     li
                         [ rowStyles
                         , class "gap-2"
-                        , preventDefaultOn "mouseover" (D.succeed ( HandleMouseOverQuestion questionIndex, True ))
-                        , preventDefaultOn "mouseout" (D.succeed ( HandleMouseOutQuestion questionIndex, True ))
-                        , preventDefaultOn "mouseup" (D.succeed ( HandleMouseUpQuestion questionIndex, True ))
+                        , preventDefaultOn "pointerover" (D.succeed ( HandleMouseOverQuestion questionIndex, True ))
+                        , preventDefaultOn "pointerout" (D.succeed ( HandleMouseOutQuestion questionIndex, True ))
+                        , preventDefaultOn "pointerup" (D.succeed ( HandleMouseUpQuestion questionIndex, True ))
                         ]
                         [ div
                             [ class "h-12 flex items-center gap-2 p-4 border border-dashed border-2 rounded-lg border-neutral border-opacity-0"
@@ -462,7 +461,7 @@ gameView game maybeDragData =
                 [ div
                     ([ answerDimensionClass
                      , class "rounded flex items-center justify-center border border-neutral bg-base-100"
-                     , preventDefaultOn "mousedown" mouseDownDecoder
+                     , preventDefaultOn "pointerdown" mouseDownDecoder
                      ]
                         ++ dragAttrs
                     )
@@ -664,6 +663,7 @@ view model =
     div
         [ class "w-screen h-screen overflow-auto p-4 lg:p-16 pb-4"
         , onMouseUp HandleMouseUpWindow
+        , on "pointermove" (D.map HandleMouseMove coordDecoder)
         , classList [ ( "cursor-none", dragInProgress ) ]
         ]
         [ case model of
