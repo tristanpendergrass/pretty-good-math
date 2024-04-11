@@ -308,7 +308,7 @@ mainMenuView =
     div [ class "w-full h-full flex flex-col gap-4 lg:gap-16 items-center" ]
         [ div [ class "prose prose-sm md:prose-base" ]
             [ h1 [ class "flex items-center text-2xl" ]
-                [ span [ class "font-bold" ] [ text "Pretty Good Math v2" ]
+                [ span [ class "font-bold" ] [ text "Pretty Good Math v3" ]
                 ]
             , p []
                 [ text "Welcome to Pretty Good Math, this is your final exam!"
@@ -446,6 +446,7 @@ gameView game maybeDragData =
                             if draggedAnswer == index then
                                 [ class "fixed shadow-lg z-10"
                                 , style "pointer-events" "none"
+                                , style "touch-action" "none"
                                 , style "top" (String.fromFloat (mouseCoords.y - offset.y) ++ "px")
                                 , style "left" (String.fromFloat (mouseCoords.x - offset.x) ++ "px")
                                 ]
