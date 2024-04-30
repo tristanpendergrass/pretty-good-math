@@ -4,15 +4,12 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Config exposing (config)
-import FeatherIcons
 import Game exposing (CompletedGame, Game)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.Keyed
+import Html.Events.Extra.Pointer as Pointer
 import Json.Decode as D
-import List.Extra
-import Maybe.Extra
 import Random
 import Task
 import ThinkingSvg exposing (thinkingSvg)
@@ -52,14 +49,7 @@ init _ =
 
 
 -- UPDATE
-
-
-coordDecoder : D.Decoder Coords
-coordDecoder =
-    D.map2
-        Coords
-        (D.field "clientX" D.float)
-        (D.field "clientY" D.float)
+-- { touches : [ { clientX : Float, clientY : Float } ] }
 
 
 type Msg
@@ -69,12 +59,12 @@ type Msg
     | HandleStartGameClick
     | HandleAnswerInput Int Game.Answer
     | HandleNextSheetClick
-    | HandleMouseDownAnswer Int Coords Browser.Dom.Element
-    | HandleMouseOverQuestion Int
-    | HandleMouseOutQuestion Int
-    | HandleMouseUpQuestion Int
-    | HandleMouseUpWindow
-    | HandleMouseMove Coords
+    | HandlePointerDownAnswer Int Pointer.Event Browser.Dom.Element
+    | HandlePointerEnterQuestion Int
+    | HandlePointerLeaveQuestion Int
+    | HandlePointerUpQuestion Int
+    | HandlePointerUpWindow
+    | HandlePointerMove Pointer.Event
     | HandleStartOverClick
     | HandleGiveUpClick
     | HandleMainMenuClick
@@ -141,14 +131,21 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseDownAnswer index coords element ->
+        HandlePointerDownAnswer index event element ->
             case model of
                 GameStarted seed game _ ->
                     let
+                        ( pointerX, pointerY ) =
+                            event.pointer.clientPos
+
+                        coords : Coords
+                        coords =
+                            { x = pointerX, y = pointerY }
+
                         offset : Coords
                         offset =
-                            { x = coords.x - element.element.x
-                            , y = coords.y - element.element.y
+                            { x = pointerX - element.element.x
+                            , y = pointerY - element.element.y
                             }
 
                         newDragData : DragData
@@ -160,7 +157,7 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseOverQuestion index ->
+        HandlePointerEnterQuestion index ->
             case model of
                 GameStarted seed game (Just dragData) ->
                     let
@@ -173,7 +170,7 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseOutQuestion _ ->
+        HandlePointerLeaveQuestion _ ->
             case model of
                 GameStarted seed game (Just dragData) ->
                     let
@@ -186,7 +183,7 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseUpQuestion index ->
+        HandlePointerUpQuestion index ->
             case model of
                 GameStarted seed game (Just dragData) ->
                     let
@@ -199,7 +196,7 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseUpWindow ->
+        HandlePointerUpWindow ->
             case model of
                 GameStarted seed game _ ->
                     ( GameStarted seed game Nothing, Cmd.none )
@@ -207,10 +204,17 @@ update msg model =
                 _ ->
                     noOp
 
-        HandleMouseMove coords ->
+        HandlePointerMove event ->
             case model of
                 GameStarted seed game (Just dragData) ->
                     let
+                        ( clientX, clientY ) =
+                            event.pointer.clientPos
+
+                        coords : Coords
+                        coords =
+                            { x = clientX, y = clientY }
+
                         newDragData : DragData
                         newDragData =
                             { dragData | mouseCoords = coords }
@@ -396,9 +400,18 @@ gameView game maybeDragData =
                     li
                         [ rowStyles
                         , class "gap-2"
-                        , preventDefaultOn "pointerover" (D.succeed ( HandleMouseOverQuestion questionIndex, True ))
-                        , preventDefaultOn "pointerout" (D.succeed ( HandleMouseOutQuestion questionIndex, True ))
-                        , preventDefaultOn "pointerup" (D.succeed ( HandleMouseUpQuestion questionIndex, True ))
+                        , Pointer.onWithOptions "pointerenter"
+                            { preventDefault = True, stopPropagation = False }
+                            (\_ ->
+                                HandlePointerEnterQuestion questionIndex
+                                    |> Debug.log "pointerEnter"
+                            )
+                        , Pointer.onWithOptions "pointerleave"
+                            { preventDefault = True, stopPropagation = False }
+                            (\_ -> HandlePointerLeaveQuestion questionIndex)
+                        , Pointer.onWithOptions "pointerup"
+                            { preventDefault = True, stopPropagation = False }
+                            (\_ -> HandlePointerUpQuestion questionIndex)
                         ]
                         [ div
                             [ class "h-12 flex items-center gap-2 p-4 border border-dashed border-2 rounded-lg border-neutral border-opacity-0"
@@ -425,17 +438,6 @@ gameView game maybeDragData =
         renderAnswer : Int -> Game.Answer -> Html Msg
         renderAnswer index answer =
             let
-                mouseDownDecoder : D.Decoder ( Msg, Bool )
-                mouseDownDecoder =
-                    coordDecoder
-                        |> D.map
-                            (\coords ->
-                                ( HandleMouseDownAnswer index coords
-                                    |> WithElement (answerId index)
-                                , True
-                                )
-                            )
-
                 dragAttrs : List (Attribute Msg)
                 dragAttrs =
                     case maybeDragData of
@@ -444,9 +446,7 @@ gameView game maybeDragData =
 
                         Just { draggedAnswer, mouseCoords, offset } ->
                             if draggedAnswer == index then
-                                [ class "fixed shadow-lg z-10"
-                                , style "pointer-events" "none"
-                                , style "touch-action" "none"
+                                [ class "fixed shadow-lg z-10 pointer-events-none"
                                 , style "top" (String.fromFloat (mouseCoords.y - offset.y) ++ "px")
                                 , style "left" (String.fromFloat (mouseCoords.x - offset.x) ++ "px")
                                 ]
@@ -462,7 +462,12 @@ gameView game maybeDragData =
                 [ div
                     ([ answerDimensionClass
                      , class "rounded flex items-center justify-center border border-neutral bg-base-100"
-                     , preventDefaultOn "pointerdown" mouseDownDecoder
+                     , Pointer.onWithOptions "pointerdown"
+                        { stopPropagation = False, preventDefault = True }
+                        (\event ->
+                            HandlePointerDownAnswer index event
+                                |> WithElement (answerId index)
+                        )
                      ]
                         ++ dragAttrs
                     )
@@ -662,11 +667,21 @@ view model =
                     False
     in
     div
-        [ class "w-screen h-screen overflow-auto p-4 lg:p-16 pb-4"
-        , onMouseUp HandleMouseUpWindow
-        , preventDefaultOn "pointermove" (D.map (\coords -> ( HandleMouseMove coords, True )) coordDecoder)
-        , classList [ ( "cursor-none", dragInProgress ) ]
-        ]
+        ([ class "w-screen h-screen overflow-auto p-4 lg:p-16 pb-4"
+         , Pointer.onUp (\_ -> HandlePointerUpWindow)
+         , Pointer.onWithOptions "pointermove"
+            { stopPropagation = False, preventDefault = True }
+            HandlePointerMove
+         , classList [ ( "cursor-none", dragInProgress ) ]
+         ]
+            ++ (if dragInProgress then
+                    [ style "touch-action" "none"
+                    ]
+
+                else
+                    []
+               )
+        )
         [ case model of
             MainMenu _ ->
                 mainMenuView

@@ -3,8 +3,8 @@ module Config exposing (config)
 
 config : Config
 config =
-    -- devConfig
-    prodConfig
+    -- prodConfig
+    devConfig
 
 
 type alias Config =
