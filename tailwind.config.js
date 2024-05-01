@@ -28,7 +28,8 @@ module.exports = {
       animation: {
         fadeInUp: 'fadeInUp 500ms ease-out',
         slideRotate: 'slideRotate 250ms ease-out',
-        float: 'float 3s ease-in-out 0ms infinite'
+        float: 'float 3s ease-in-out 0ms infinite',
+        fadeInThenFloat: 'fadeInUp 500ms ease-out, float 2s infinite 500ms'
       },
     },
   },

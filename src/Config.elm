@@ -38,4 +38,5 @@ devConfig : Config
 devConfig =
     { prodConfig
         | roundDuration = 1000 * 1000
+        , answersPerSheet = 8
     }

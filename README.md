@@ -22,7 +22,6 @@ $ npm start -- If on Mac, use npm start-mac
 
 # Todos
 [x] Fix drag an drop
-[ ] Add click to answer option
 [ ] Generate answers over time
 [ ] Start player on test cover with instructions to click next page
 [ ] Move menu buttons from top center to far right or something

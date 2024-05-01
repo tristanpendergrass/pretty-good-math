@@ -442,7 +442,8 @@ gameView game maybeDragData =
                 dragAttrs =
                     case maybeDragData of
                         Nothing ->
-                            [ class "cursor-move animate-float", style "animation-delay" (String.fromInt (modBy 1000 (index * 200)) ++ "ms") ]
+                            [ class "cursor-move animate-fadeInThenFloat"
+                            ]
 
                         Just { draggedAnswer, mouseCoords, offset } ->
                             if draggedAnswer == index then
@@ -452,7 +453,7 @@ gameView game maybeDragData =
                                 ]
 
                             else
-                                [ class "animate-float" ]
+                                [ class "animate-fadeInThenFloat" ]
             in
             -- This extra div is to occupy space while a drag is in progress
             div
@@ -461,7 +462,7 @@ gameView game maybeDragData =
                 ]
                 [ div
                     ([ answerDimensionClass
-                     , class "rounded flex items-center justify-center border border-neutral bg-base-100"
+                     , class "rounded flex items-center justify-center border border-neutral bg-base-100 animate-fadeInThenFloat"
                      , Pointer.onWithOptions "pointerdown"
                         { stopPropagation = False, preventDefault = True }
                         (\event ->
