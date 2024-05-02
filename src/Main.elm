@@ -84,11 +84,15 @@ update msg model =
         HandleAnimationFrameDelta delta ->
             case model of
                 GameStarted seed game dragData ->
-                    case Game.updateTimer delta game of
-                        Game.TimeLeft newGame ->
-                            ( GameStarted seed newGame dragData, Cmd.none )
+                    case Game.handleAnimationFrameDelta delta game of
+                        Game.GameContinues newGameGenerator ->
+                            let
+                                ( newGame, newSeed ) =
+                                    Random.step newGameGenerator seed
+                            in
+                            ( GameStarted newSeed newGame dragData, Cmd.none )
 
-                        Game.TimeUp completedGame ->
+                        Game.GameEnded completedGame ->
                             ( GameOver seed completedGame, Cmd.none )
 
                 _ ->
@@ -529,7 +533,7 @@ gameView game maybeDragData =
             [ -- Answers
               div [ class "flex flex-col items-end gap-6 p-4 xl:p-16" ]
                 [ div [ class "text-xl font-bold" ] [ text "Answers" ]
-                , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4" ]
+                , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4 min-h-[48px]" ]
                     (List.indexedMap renderAnswer game.answers)
                 , div [ class "w-600px max-w-[600px]" ]
                     [ thinkingSvg

@@ -35,6 +35,7 @@ type alias Game =
     , currentSheet : Sheet
     , answers : List Answer
     , timeLeft : Float
+    , newAnswerTimeLeft : Float
     }
 
 
@@ -69,33 +70,29 @@ sheetGenerator =
     Random.list config.questionsPerSheet (Random.map Unanswered questionGenerator)
 
 
-answersGenerator : Random.Generator (List Answer)
-answersGenerator =
-    Random.list config.answersPerSheet answerGenerator
-
-
 gameGenerator : Random.Generator Game
 gameGenerator =
-    Random.map2
-        (\initialSheet initialAnswers ->
+    Random.map
+        (\initialSheet ->
             { completedSheets = []
             , currentSheet = initialSheet
-            , answers = initialAnswers
+            , answers = []
             , timeLeft = config.roundDuration
+
+            -- For his first answer we don't make it random but rather make it happen right away to get the game going
+            , newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound
             }
         )
         sheetGenerator
-        answersGenerator
 
 
 goNextSheetGenerator : Game -> Random.Generator Game
 goNextSheetGenerator game =
-    Random.map2
-        (\newSheet newAnswers ->
-            { game | currentSheet = newSheet, answers = newAnswers, completedSheets = game.currentSheet :: game.completedSheets }
+    Random.map
+        (\newSheet ->
+            { game | currentSheet = newSheet, answers = [], completedSheets = game.currentSheet :: game.completedSheets }
         )
         sheetGenerator
-        answersGenerator
 
 
 
@@ -171,18 +168,39 @@ percentTimeLeft { timeLeft } =
     timeLeft / config.roundDuration
 
 
-type UpdateTimerResult
-    = TimeUp CompletedGame
-    | TimeLeft Game
+type UpdateGameResult
+    = GameEnded CompletedGame
+    | GameContinues (Random.Generator Game)
 
 
-updateTimer : Float -> Game -> UpdateTimerResult
-updateTimer delta game =
-    if game.timeLeft - delta <= 0 then
-        TimeUp (completeGame game)
+updateAnswerTimeLeft : Float -> Game -> Random.Generator Game
+updateAnswerTimeLeft delta game =
+    if game.newAnswerTimeLeft - delta <= 0 then
+        let
+            { lowerBound, upperBound } =
+                config.newAnswerTimeSlow
+        in
+        Random.map2
+            (\newAnswerTimeLeft newAnswer ->
+                { game | newAnswerTimeLeft = newAnswerTimeLeft, answers = List.append game.answers [ newAnswer ] }
+            )
+            (Random.float lowerBound upperBound)
+            answerGenerator
 
     else
-        TimeLeft { game | timeLeft = game.timeLeft - delta }
+        Random.constant { game | newAnswerTimeLeft = game.newAnswerTimeLeft - delta }
+
+
+handleAnimationFrameDelta : Float -> Game -> UpdateGameResult
+handleAnimationFrameDelta delta game =
+    if game.timeLeft - delta <= 0 then
+        GameEnded (completeGame game)
+
+    else
+        game
+            |> (\g -> { g | timeLeft = g.timeLeft - delta })
+            |> updateAnswerTimeLeft delta
+            |> GameContinues
 
 
 completeGame : Game -> CompletedGame
@@ -293,3 +311,12 @@ allQuestionsAnswered { currentSheet } =
                     False
         )
         currentSheet
+
+
+addAnswer : Game -> Random.Generator Game
+addAnswer game =
+    answerGenerator
+        |> Random.map
+            (\answer ->
+                { game | answers = List.append game.answers [ answer ] }
+            )
