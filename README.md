@@ -23,5 +23,8 @@ $ npm start -- If on Mac, use npm start-mac
 # Todos
 [x] Fix drag an drop
 [x] Generate answers over time
-[ ] Start player on test cover with instructions to click next page
 [ ] Move menu buttons from top center to far right or something
+[ ] Update score sheet
+  [ ] Remove Count column and show same data in Score column like "Perfect x10"
+  [ ] Move Result to top of area
+  [ ] Apply fade in animation to final result

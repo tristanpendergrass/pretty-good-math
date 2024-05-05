@@ -326,7 +326,7 @@ mainMenuView =
                 , li [] [ text "Remember that math isn't about being perfect! ", renderScore Game.PrettyGood, text " is good enough :)" ]
                 , li [] [ text "Click ", span [ class "badge" ] [ text "Next Sheet" ], text " when you're ready for the next page of problems" ]
                 ]
-            , p [] [ text "You have ", strong [] [ text "30 seconds" ], text " to answer as many questions as you can. Good luck!" ]
+            , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
             ]
         , button [ class "btn btn-primary px-16", onClick HandleStartGameClick ] [ text "Start!" ]
         , div [ class "divider" ] []
@@ -353,7 +353,7 @@ renderScore score =
                 Game.WhatTheHeck ->
                     ( "What the heck?", class "badge-error" )
     in
-    div [ class "badge", badgeClass ]
+    div [ class "badge animate-fadeInUp", badgeClass ]
         [ text scoreText ]
 
 
@@ -524,10 +524,12 @@ gameView game maybeDragData =
                 )
     in
     div [ class "w-full h-full flex flex-col gap-4" ]
-        [ div [ class "flex justify-center items-center gap-8" ]
-            [ button [ class "btn btn-sm btn-outline", onClick HandleStartOverClick ] [ text "Start Over" ]
-            , renderTimer
-            , button [ class "btn btn-sm btn-error", onClick HandleGiveUpClick ] [ text "Give up" ]
+        [ div [ class "flex justify-center items-center relative" ]
+            [ renderTimer
+            , div [ class "flex items-center gap-8 h-full absolute top-0 right-0" ]
+                [ button [ class "btn btn-sm btn-outline", onClick HandleStartOverClick ] [ text "Start Over" ]
+                , button [ class "btn btn-sm btn-error", onClick HandleGiveUpClick ] [ text "Give up" ]
+                ]
             ]
         , div [ class "w-full grid grid-cols-2 gap-4" ]
             [ -- Answers

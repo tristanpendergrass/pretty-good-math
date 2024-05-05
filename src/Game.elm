@@ -90,7 +90,12 @@ goNextSheetGenerator : Game -> Random.Generator Game
 goNextSheetGenerator game =
     Random.map
         (\newSheet ->
-            { game | currentSheet = newSheet, answers = [], completedSheets = game.currentSheet :: game.completedSheets }
+            { game
+                | currentSheet = newSheet
+                , answers = []
+                , completedSheets = game.currentSheet :: game.completedSheets
+                , newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound
+            }
         )
         sheetGenerator
 
@@ -140,6 +145,7 @@ answerQuestion questionIndex answerIndex game =
                     )
                 |> updateAnswers
                     (List.Extra.remove answer)
+                |> (\g -> { g | newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound })
 
 
 scoreQuestion : Question -> Answer -> Score
@@ -175,7 +181,10 @@ type UpdateGameResult
 
 updateAnswerTimeLeft : Float -> Game -> Random.Generator Game
 updateAnswerTimeLeft delta game =
-    if game.newAnswerTimeLeft - delta <= 0 then
+    if List.length game.answers >= config.maxAnswers then
+        Random.constant game
+
+    else if game.newAnswerTimeLeft - delta <= 0 then
         let
             { lowerBound, upperBound } =
                 config.newAnswerTimeSlow

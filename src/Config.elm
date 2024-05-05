@@ -19,12 +19,13 @@ type alias Config =
     , passPoints : Int
     , newAnswerTimeSlow : { lowerBound : Float, upperBound : Float }
     , newAnswerTimeFast : { lowerBound : Float, upperBound : Float }
+    , maxAnswers : Int
     }
 
 
 prodConfig : Config
 prodConfig =
-    { roundDuration = 30 * 1000
+    { roundDuration = 60 * 1000
     , addendLowerBound = 1
     , addendUpperBound = 10
     , prettyGoodMargin = 2
@@ -35,6 +36,7 @@ prodConfig =
     , passPoints = 20
     , newAnswerTimeSlow = { lowerBound = 2000, upperBound = 3500 }
     , newAnswerTimeFast = { lowerBound = 250, upperBound = 1000 }
+    , maxAnswers = 10
     }
 
 
