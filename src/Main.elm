@@ -408,7 +408,6 @@ gameView game maybeDragData =
                             { preventDefault = True, stopPropagation = False }
                             (\_ ->
                                 HandlePointerEnterQuestion questionIndex
-                                    |> Debug.log "pointerEnter"
                             )
                         , Pointer.onWithOptions "pointerleave"
                             { preventDefault = True, stopPropagation = False }
