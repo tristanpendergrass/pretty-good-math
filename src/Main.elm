@@ -313,6 +313,11 @@ answerId index =
 
 mainMenuView : Html Msg
 mainMenuView =
+    let
+        prettyGood : Html Msg
+        prettyGood =
+            div [ class "badge badge-info" ] [ text "Pretty Good" ]
+    in
     div [ class "w-full h-full flex flex-col gap-4 lg:gap-16 items-center" ]
         [ div [ class "prose prose-sm md:prose-base" ]
             [ h1 [ class "flex items-center text-2xl" ]
@@ -323,7 +328,7 @@ mainMenuView =
                 ]
             , ol []
                 [ li [] [ text "Drag and drop ", strong [] [ text "answers" ], text " onto ", strong [] [ text "questions" ] ]
-                , li [] [ text "Remember that math isn't about being perfect! ", renderScore Game.PrettyGood, text " is good enough :)" ]
+                , li [] [ text "Remember that math isn't about being perfect! ", prettyGood, text " is good enough :)" ]
                 , li [] [ text "Click ", span [ class "badge" ] [ text "Next Sheet" ], text " when you're ready for the next page of problems" ]
                 ]
             , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
@@ -534,7 +539,7 @@ gameView game maybeDragData =
             [ -- Answers
               div [ class "flex flex-col items-end gap-6 p-4 xl:p-16" ]
                 [ div [ class "text-xl font-bold" ] [ text "Answers" ]
-                , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4 min-h-[48px]" ]
+                , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4 min-h-[48px]", style "direction" "rtl" ]
                     (List.indexedMap renderAnswer game.answers)
                 , div [ class "w-600px max-w-[600px]" ]
                     [ thinkingSvg
