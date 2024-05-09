@@ -2,8 +2,38 @@ module Game exposing (..)
 
 import Config exposing (config)
 import Html.Attributes exposing (download)
+import List
 import List.Extra
 import Random
+
+
+answers : ( Int, List Int )
+answers =
+    let
+        reduceFn : Int -> List Int -> List Int
+        reduceFn m accum =
+            List.range m config.multiplicandUpperBound
+                |> List.map ((*) m)
+                |> List.append accum
+    in
+    List.range config.multiplicandLowerBound config.multiplicandUpperBound
+        |> List.foldl reduceFn []
+        |> (\res ->
+                let
+                    rest : List Int
+                    rest =
+                        List.drop 1 res
+
+                    first : Int
+                    first =
+                        config.multiplicandLowerBound * config.multiplicandLowerBound
+                in
+                ( first, rest )
+           )
+
+
+
+-- To use nonPrimes, for example, you can output it or work with it in your application logic.
 
 
 type Score
@@ -14,7 +44,13 @@ type Score
 
 
 type Question
-    = Addition Int Int
+    = QuestionAddition Int Int
+    | QuestionMultiplication Int Int
+
+
+type GameType
+    = GameAddition
+    | GameMultiplication
 
 
 type alias Answer =
@@ -36,6 +72,7 @@ type alias Game =
     , answers : List Answer
     , timeLeft : Float
     , newAnswerTimeLeft : Float
+    , gameType : GameType
     }
 
 
@@ -48,30 +85,49 @@ type alias CompletedGame =
 -- Generators
 
 
-addend : Random.Generator Int
-addend =
-    Random.int config.addendLowerBound config.addendUpperBound
+questionGenerator : GameType -> Random.Generator Question
+questionGenerator gameType =
+    case gameType of
+        GameAddition ->
+            let
+                addendGenerator : Random.Generator Int
+                addendGenerator =
+                    Random.int config.multiplicandLowerBound config.multiplicandUpperBound
+            in
+            Random.map2 QuestionAddition addendGenerator addendGenerator
+
+        GameMultiplication ->
+            let
+                multiplicandGenerator : Random.Generator Int
+                multiplicandGenerator =
+                    Random.int config.multiplicandLowerBound config.multiplicandUpperBound
+            in
+            Random.map2 QuestionMultiplication multiplicandGenerator multiplicandGenerator
 
 
-questionGenerator : Random.Generator Question
-questionGenerator =
-    Random.map2 Addition addend addend
+answerGenerator : GameType -> Random.Generator Answer
+answerGenerator gameType =
+    case gameType of
+        GameAddition ->
+            Random.int
+                (config.multiplicandLowerBound + config.multiplicandLowerBound)
+                (config.multiplicandUpperBound + config.multiplicandUpperBound)
+
+        GameMultiplication ->
+            let
+                ( firstAnswer, restAnswers ) =
+                    answers
+            in
+            Random.uniform firstAnswer restAnswers
 
 
-answerGenerator : Random.Generator Answer
-answerGenerator =
-    Random.int
-        (config.addendLowerBound + config.addendLowerBound)
-        (config.addendUpperBound + config.addendUpperBound)
+sheetGenerator : Random.Generator Question -> Random.Generator Sheet
+sheetGenerator qGenerator =
+    Random.list config.questionsPerSheet (Random.map Unanswered qGenerator)
 
 
-sheetGenerator : Random.Generator Sheet
-sheetGenerator =
-    Random.list config.questionsPerSheet (Random.map Unanswered questionGenerator)
-
-
-gameGenerator : Random.Generator Game
-gameGenerator =
+newGameGenerator : GameType -> Random.Generator Game
+newGameGenerator gameType =
     Random.map
         (\initialSheet ->
             { completedSheets = []
@@ -81,9 +137,10 @@ gameGenerator =
 
             -- For his first answer we don't make it random but rather make it happen right away to get the game going
             , newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound
+            , gameType = gameType
             }
         )
-        sheetGenerator
+        (sheetGenerator (questionGenerator gameType))
 
 
 goNextSheetGenerator : Game -> Random.Generator Game
@@ -97,7 +154,7 @@ goNextSheetGenerator game =
                 , newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound
             }
         )
-        sheetGenerator
+        (sheetGenerator (questionGenerator game.gameType))
 
 
 
@@ -151,10 +208,27 @@ answerQuestion questionIndex answerIndex game =
 scoreQuestion : Question -> Answer -> Score
 scoreQuestion question answer =
     case question of
-        Addition left right ->
+        QuestionAddition left right ->
             let
                 correctAnswer =
                     left + right
+            in
+            if answer == correctAnswer then
+                Perfect
+
+            else if abs (answer - correctAnswer) <= config.prettyGoodMargin then
+                PrettyGood
+
+            else if abs (answer - correctAnswer) <= config.sureMargin then
+                Sure
+
+            else
+                WhatTheHeck
+
+        QuestionMultiplication left right ->
+            let
+                correctAnswer =
+                    left * right
             in
             if answer == correctAnswer then
                 Perfect
@@ -194,7 +268,7 @@ updateAnswerTimeLeft delta game =
                 { game | newAnswerTimeLeft = newAnswerTimeLeft, answers = List.append game.answers [ newAnswer ] }
             )
             (Random.float lowerBound upperBound)
-            answerGenerator
+            (answerGenerator game.gameType)
 
     else
         Random.constant { game | newAnswerTimeLeft = game.newAnswerTimeLeft - delta }
@@ -324,8 +398,8 @@ allQuestionsAnswered { currentSheet } =
 
 addAnswer : Game -> Random.Generator Game
 addAnswer game =
-    answerGenerator
-        |> Random.map
-            (\answer ->
-                { game | answers = List.append game.answers [ answer ] }
-            )
+    Random.map
+        (\answer ->
+            { game | answers = List.append game.answers [ answer ] }
+        )
+        (answerGenerator game.gameType)

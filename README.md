@@ -23,7 +23,10 @@ $ npm start -- If on Mac, use npm start-mac
 # Todos
 [x] Fix drag an drop
 [x] Generate answers over time
-[ ] Move menu buttons from top center to far right or something
+[x] Move menu buttons from top center to far right or something
+[ ] Dedupe answers
+[x] Add ability to toggle between addition and multiplication
+[ ] Add big addition
 [ ] Update score sheet
   [ ] Remove Count column and show same data in Score column like "Perfect x10"
   [ ] Move Result to top of area

@@ -11,6 +11,8 @@ type alias Config =
     { roundDuration : Float -- Duration in milliseconds
     , addendLowerBound : Int -- Bounds for generating addition problems
     , addendUpperBound : Int
+    , multiplicandLowerBound : Int -- Bounds for generating multiplication problems
+    , multiplicandUpperBound : Int
     , prettyGoodMargin : Int -- "Pretty Good" if abs(actual - given) answer is equal to or less than this number
     , sureMargin : Int -- "Sure" if abs(actual - given) answer is equal to or less than this number
     , questionsPerSheet : Int -- How many questions shown on a single sheet
@@ -28,6 +30,8 @@ prodConfig =
     { roundDuration = 60 * 1000
     , addendLowerBound = 1
     , addendUpperBound = 10
+    , multiplicandLowerBound = 2
+    , multiplicandUpperBound = 8
     , prettyGoodMargin = 2
     , sureMargin = 4
     , questionsPerSheet = 5

@@ -4,6 +4,7 @@ import Browser
 import Browser.Dom
 import Browser.Events
 import Config exposing (config)
+import FeatherIcons
 import Game exposing (CompletedGame, Game)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -37,14 +38,14 @@ type alias DragData =
 
 
 type Model
-    = MainMenu Random.Seed
-    | GameStarted Random.Seed Game (Maybe DragData)
-    | GameOver Random.Seed CompletedGame
+    = MainMenu Random.Seed Game.GameType
+    | GameStarted Random.Seed Game.GameType Game (Maybe DragData)
+    | GameOver Random.Seed Game.GameType CompletedGame
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( MainMenu (Random.initialSeed 0), Cmd.none )
+    ( MainMenu (Random.initialSeed 0) Game.GameAddition, Cmd.none )
 
 
 
@@ -68,6 +69,7 @@ type Msg
     | HandleStartOverClick
     | HandleGiveUpClick
     | HandleMainMenuClick
+    | HandleGameTypeClick Game.GameType
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,61 +85,61 @@ update msg model =
 
         HandleAnimationFrameDelta delta ->
             case model of
-                GameStarted seed game dragData ->
+                GameStarted seed gameType game dragData ->
                     case Game.handleAnimationFrameDelta delta game of
                         Game.GameContinues newGameGenerator ->
                             let
                                 ( newGame, newSeed ) =
                                     Random.step newGameGenerator seed
                             in
-                            ( GameStarted newSeed newGame dragData, Cmd.none )
+                            ( GameStarted newSeed gameType newGame dragData, Cmd.none )
 
                         Game.GameEnded completedGame ->
-                            ( GameOver seed completedGame, Cmd.none )
+                            ( GameOver seed gameType completedGame, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleStartGameClick ->
             case model of
-                MainMenu seed ->
+                MainMenu seed gameType ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step Game.gameGenerator seed
+                            Random.step (Game.newGameGenerator Game.GameMultiplication) seed
                     in
-                    ( GameStarted newSeed newGame Nothing, Cmd.none )
+                    ( GameStarted newSeed gameType newGame Nothing, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleAnswerInput questionIndex answer ->
             case model of
-                GameStarted seed game dragData ->
+                GameStarted seed gameType game dragData ->
                     let
                         newGame : Game
                         newGame =
                             Game.answerQuestion questionIndex answer game
                     in
-                    ( GameStarted seed newGame dragData, Cmd.none )
+                    ( GameStarted seed gameType newGame dragData, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleNextSheetClick ->
             case model of
-                GameStarted seed game dragData ->
+                GameStarted seed gameType game dragData ->
                     let
                         ( newGame, newSeed ) =
                             Random.step (Game.goNextSheetGenerator game) seed
                     in
-                    ( GameStarted newSeed newGame dragData, Cmd.none )
+                    ( GameStarted newSeed gameType newGame dragData, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerDownAnswer index event element ->
             case model of
-                GameStarted seed game _ ->
+                GameStarted seed gameType game _ ->
                     let
                         ( pointerX, pointerY ) =
                             event.pointer.clientPos
@@ -156,61 +158,61 @@ update msg model =
                         newDragData =
                             { draggedAnswer = index, draggedOverQuestion = Nothing, mouseCoords = coords, offset = offset }
                     in
-                    ( GameStarted seed game (Just newDragData), Cmd.none )
+                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerEnterQuestion index ->
             case model of
-                GameStarted seed game (Just dragData) ->
+                GameStarted seed gameType game (Just dragData) ->
                     let
                         newDragData : DragData
                         newDragData =
                             { dragData | draggedOverQuestion = Just index }
                     in
-                    ( GameStarted seed game (Just newDragData), Cmd.none )
+                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerLeaveQuestion _ ->
             case model of
-                GameStarted seed game (Just dragData) ->
+                GameStarted seed gameType game (Just dragData) ->
                     let
                         newDragData : DragData
                         newDragData =
                             { dragData | draggedOverQuestion = Nothing }
                     in
-                    ( GameStarted seed game (Just newDragData), Cmd.none )
+                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerUpQuestion index ->
             case model of
-                GameStarted seed game (Just dragData) ->
+                GameStarted seed gameType game (Just dragData) ->
                     let
                         newGame : Game
                         newGame =
                             Game.answerQuestion index dragData.draggedAnswer game
                     in
-                    ( GameStarted seed newGame Nothing, Cmd.none )
+                    ( GameStarted seed gameType newGame Nothing, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerUpWindow ->
             case model of
-                GameStarted seed game _ ->
-                    ( GameStarted seed game Nothing, Cmd.none )
+                GameStarted seed gameType game _ ->
+                    ( GameStarted seed gameType game Nothing, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerMove event ->
             case model of
-                GameStarted seed game (Just dragData) ->
+                GameStarted seed gameType game (Just dragData) ->
                     let
                         ( clientX, clientY ) =
                             event.pointer.clientPos
@@ -223,46 +225,45 @@ update msg model =
                         newDragData =
                             { dragData | mouseCoords = coords }
                     in
-                    ( GameStarted seed game (Just newDragData), Cmd.none )
+                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
 
                 _ ->
                     noOp
 
         HandleStartOverClick ->
             case model of
-                GameStarted seed _ _ ->
+                GameStarted seed gameType game _ ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step Game.gameGenerator seed
+                            Random.step (Game.newGameGenerator game.gameType) seed
                     in
-                    ( GameStarted newSeed newGame Nothing, Cmd.none )
+                    ( GameStarted newSeed gameType newGame Nothing, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleGiveUpClick ->
             case model of
-                GameStarted seed game _ ->
-                    ( GameOver seed (Game.completeGame game), Cmd.none )
+                GameStarted seed gameType game _ ->
+                    ( GameOver seed gameType (Game.completeGame game), Cmd.none )
 
                 _ ->
                     noOp
 
         HandleMainMenuClick ->
             let
-                newSeed : Random.Seed
-                newSeed =
+                ( newSeed, gameType ) =
                     case model of
-                        MainMenu seed ->
-                            seed
+                        MainMenu seed g ->
+                            ( seed, g )
 
-                        GameStarted seed _ _ ->
-                            seed
+                        GameStarted seed g _ _ ->
+                            ( seed, g )
 
-                        GameOver seed _ ->
-                            seed
+                        GameOver seed g _ ->
+                            ( seed, g )
             in
-            ( MainMenu newSeed, Cmd.none )
+            ( MainMenu newSeed gameType, Cmd.none )
 
         WithElement id messageNeedingElement ->
             let
@@ -275,6 +276,14 @@ update msg model =
             ( model
             , Task.attempt handleGetElementResult (Browser.Dom.getElement id)
             )
+
+        HandleGameTypeClick gameType ->
+            case model of
+                MainMenu seed _ ->
+                    ( MainMenu seed gameType, Cmd.none )
+
+                _ ->
+                    noOp
 
 
 
@@ -311,8 +320,8 @@ answerId index =
     "answer-" ++ String.fromInt index
 
 
-mainMenuView : Html Msg
-mainMenuView =
+mainMenuView : Game.GameType -> Html Msg
+mainMenuView gameType =
     let
         prettyGood : Html Msg
         prettyGood =
@@ -332,6 +341,32 @@ mainMenuView =
                 , li [] [ text "Click ", span [ class "badge" ] [ text "Next Sheet" ], text " when you're ready for the next page of problems" ]
                 ]
             , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
+            ]
+        , div [ class "flex items-center gap-4" ]
+            [ label
+                [ class "flex items-center gap-1 cursor-pointer"
+                , Pointer.onDown (\_ -> HandleGameTypeClick Game.GameAddition)
+                ]
+                [ text "Addition"
+                , input
+                    [ type_ "radio"
+                    , class "radio"
+                    , checked (gameType == Game.GameAddition)
+                    ]
+                    []
+                ]
+            , label
+                [ class "flex items-center gap-1 cursor-pointer"
+                , Pointer.onDown (\_ -> HandleGameTypeClick Game.GameMultiplication)
+                ]
+                [ text "Multiplication"
+                , input
+                    [ type_ "radio"
+                    , class "radio"
+                    , checked (gameType == Game.GameMultiplication)
+                    ]
+                    []
+                ]
             ]
         , button [ class "btn btn-primary px-16", onClick HandleStartGameClick ] [ text "Start!" ]
         , div [ class "divider" ] []
@@ -368,12 +403,30 @@ gameView game maybeDragData =
         renderQuestion : Int -> Game.Question -> Html Msg
         renderQuestion index question =
             case question of
-                Game.Addition left right ->
+                Game.QuestionAddition left right ->
                     div
                         [ class "h-12 flex items-center gap-2"
                         ]
                         [ span [] [ text (String.fromInt left) ]
-                        , span [] [ text "+" ]
+                        , span []
+                            [ FeatherIcons.plus
+                                |> FeatherIcons.withSize 16
+                                |> FeatherIcons.toHtml []
+                            ]
+                        , span [] [ text (String.fromInt right) ]
+                        , span [] [ text "=" ]
+                        ]
+
+                Game.QuestionMultiplication left right ->
+                    div
+                        [ class "h-12 flex items-center gap-2"
+                        ]
+                        [ span [] [ text (String.fromInt left) ]
+                        , span []
+                            [ FeatherIcons.x
+                                |> FeatherIcons.withSize 16
+                                |> FeatherIcons.toHtml []
+                            ]
                         , span [] [ text (String.fromInt right) ]
                         , span [] [ text "=" ]
                         ]
@@ -671,7 +724,7 @@ view model =
         dragInProgress : Bool
         dragInProgress =
             case model of
-                GameStarted _ _ (Just _) ->
+                GameStarted _ _ _ (Just _) ->
                     True
 
                 _ ->
@@ -694,12 +747,12 @@ view model =
                )
         )
         [ case model of
-            MainMenu _ ->
-                mainMenuView
+            MainMenu _ gameType ->
+                mainMenuView gameType
 
-            GameStarted _ game maybeDragData ->
+            GameStarted _ _ game maybeDragData ->
                 gameView game maybeDragData
 
-            GameOver _ completedGame ->
+            GameOver _ _ completedGame ->
                 gameOverView completedGame
         ]
