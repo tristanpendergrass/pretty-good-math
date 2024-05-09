@@ -4,48 +4,12 @@ import Config exposing (config)
 import Html.Attributes exposing (download)
 import List
 import List.Extra
+import Math
 import Random
-
-
-answers : ( Int, List Int )
-answers =
-    let
-        reduceFn : Int -> List Int -> List Int
-        reduceFn m accum =
-            List.range m config.multiplicandUpperBound
-                |> List.map ((*) m)
-                |> List.append accum
-    in
-    List.range config.multiplicandLowerBound config.multiplicandUpperBound
-        |> List.foldl reduceFn []
-        |> (\res ->
-                let
-                    rest : List Int
-                    rest =
-                        List.drop 1 res
-
-                    first : Int
-                    first =
-                        config.multiplicandLowerBound * config.multiplicandLowerBound
-                in
-                ( first, rest )
-           )
 
 
 
 -- To use nonPrimes, for example, you can output it or work with it in your application logic.
-
-
-type Score
-    = Perfect
-    | PrettyGood
-    | Sure
-    | WhatTheHeck
-
-
-type Question
-    = QuestionAddition Int Int
-    | QuestionMultiplication Int Int
 
 
 type GameType
@@ -58,8 +22,8 @@ type alias Answer =
 
 
 type QuestionAnswerPair
-    = Answered Question Answer
-    | Unanswered Question
+    = Answered Math.Question Answer
+    | Unanswered Math.Question
 
 
 type alias Sheet =
@@ -81,53 +45,32 @@ type alias CompletedGame =
     }
 
 
+getStats : GameType -> Math.QuestionTypeStats
+getStats gameType =
+    case gameType of
+        GameAddition ->
+            Math.additionStats
+
+        GameMultiplication ->
+            Math.multiplicationStats
+
+
 
 -- Generators
 
 
-questionGenerator : GameType -> Random.Generator Question
-questionGenerator gameType =
-    case gameType of
-        GameAddition ->
-            let
-                addendGenerator : Random.Generator Int
-                addendGenerator =
-                    Random.int config.multiplicandLowerBound config.multiplicandUpperBound
-            in
-            Random.map2 QuestionAddition addendGenerator addendGenerator
-
-        GameMultiplication ->
-            let
-                multiplicandGenerator : Random.Generator Int
-                multiplicandGenerator =
-                    Random.int config.multiplicandLowerBound config.multiplicandUpperBound
-            in
-            Random.map2 QuestionMultiplication multiplicandGenerator multiplicandGenerator
-
-
-answerGenerator : GameType -> Random.Generator Answer
-answerGenerator gameType =
-    case gameType of
-        GameAddition ->
-            Random.int
-                (config.multiplicandLowerBound + config.multiplicandLowerBound)
-                (config.multiplicandUpperBound + config.multiplicandUpperBound)
-
-        GameMultiplication ->
-            let
-                ( firstAnswer, restAnswers ) =
-                    answers
-            in
-            Random.uniform firstAnswer restAnswers
-
-
-sheetGenerator : Random.Generator Question -> Random.Generator Sheet
+sheetGenerator : Random.Generator Math.Question -> Random.Generator Sheet
 sheetGenerator qGenerator =
     Random.list config.questionsPerSheet (Random.map Unanswered qGenerator)
 
 
 newGameGenerator : GameType -> Random.Generator Game
 newGameGenerator gameType =
+    let
+        questionTypeStats : Math.QuestionTypeStats
+        questionTypeStats =
+            getStats gameType
+    in
     Random.map
         (\initialSheet ->
             { completedSheets = []
@@ -140,11 +83,16 @@ newGameGenerator gameType =
             , gameType = gameType
             }
         )
-        (sheetGenerator (questionGenerator gameType))
+        (sheetGenerator questionTypeStats.questionGenerator)
 
 
 goNextSheetGenerator : Game -> Random.Generator Game
 goNextSheetGenerator game =
+    let
+        questionTypeStats : Math.QuestionTypeStats
+        questionTypeStats =
+            getStats game.gameType
+    in
     Random.map
         (\newSheet ->
             { game
@@ -154,7 +102,7 @@ goNextSheetGenerator game =
                 , newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound
             }
         )
-        (sheetGenerator (questionGenerator game.gameType))
+        (sheetGenerator questionTypeStats.questionGenerator)
 
 
 
@@ -205,44 +153,6 @@ answerQuestion questionIndex answerIndex game =
                 |> (\g -> { g | newAnswerTimeLeft = config.newAnswerTimeFast.lowerBound })
 
 
-scoreQuestion : Question -> Answer -> Score
-scoreQuestion question answer =
-    case question of
-        QuestionAddition left right ->
-            let
-                correctAnswer =
-                    left + right
-            in
-            if answer == correctAnswer then
-                Perfect
-
-            else if abs (answer - correctAnswer) <= config.prettyGoodMargin then
-                PrettyGood
-
-            else if abs (answer - correctAnswer) <= config.sureMargin then
-                Sure
-
-            else
-                WhatTheHeck
-
-        QuestionMultiplication left right ->
-            let
-                correctAnswer =
-                    left * right
-            in
-            if answer == correctAnswer then
-                Perfect
-
-            else if abs (answer - correctAnswer) <= config.prettyGoodMargin then
-                PrettyGood
-
-            else if abs (answer - correctAnswer) <= config.sureMargin then
-                Sure
-
-            else
-                WhatTheHeck
-
-
 percentTimeLeft : Game -> Float
 percentTimeLeft { timeLeft } =
     timeLeft / config.roundDuration
@@ -262,13 +172,16 @@ updateAnswerTimeLeft delta game =
         let
             { lowerBound, upperBound } =
                 config.newAnswerTimeSlow
+
+            questionTypeStats =
+                getStats game.gameType
         in
         Random.map2
             (\newAnswerTimeLeft newAnswer ->
                 { game | newAnswerTimeLeft = newAnswerTimeLeft, answers = List.append game.answers [ newAnswer ] }
             )
             (Random.float lowerBound upperBound)
-            (answerGenerator game.gameType)
+            questionTypeStats.answerGenerator
 
     else
         Random.constant { game | newAnswerTimeLeft = game.newAnswerTimeLeft - delta }
@@ -291,19 +204,19 @@ completeGame game =
     { completedSheets = game.currentSheet :: game.completedSheets }
 
 
-scoreToPoints : Score -> Int
+scoreToPoints : Math.Score -> Int
 scoreToPoints score =
     case score of
-        Perfect ->
+        Math.Perfect ->
             config.points.perfect
 
-        PrettyGood ->
+        Math.PrettyGood ->
             config.points.prettyGood
 
-        Sure ->
+        Math.Sure ->
             config.points.sure
 
-        WhatTheHeck ->
+        Math.WhatTheHeck ->
             config.points.whatTheHeck
 
 
@@ -311,19 +224,19 @@ type alias ScoreRecord a =
     { perfect : a, prettyGood : a, sure : a, whatTheHeck : a }
 
 
-getByScore : Score -> ScoreRecord a -> a
+getByScore : Math.Score -> ScoreRecord a -> a
 getByScore score =
     case score of
-        Perfect ->
+        Math.Perfect ->
             .perfect
 
-        PrettyGood ->
+        Math.PrettyGood ->
             .prettyGood
 
-        Sure ->
+        Math.Sure ->
             .sure
 
-        WhatTheHeck ->
+        Math.WhatTheHeck ->
             .whatTheHeck
 
 
@@ -341,23 +254,23 @@ gameSummary { completedSheets } =
                     accum
 
                 Answered question answer ->
-                    case scoreQuestion question answer of
-                        Perfect ->
+                    case Math.scoreQuestion question answer of
+                        Math.Perfect ->
                             { accum
                                 | perfect = accum.perfect + 1
                             }
 
-                        PrettyGood ->
+                        Math.PrettyGood ->
                             { accum
                                 | prettyGood = accum.prettyGood + 1
                             }
 
-                        Sure ->
+                        Math.Sure ->
                             { accum
                                 | perfect = accum.sure + 1
                             }
 
-                        WhatTheHeck ->
+                        Math.WhatTheHeck ->
                             { accum
                                 | perfect = accum.whatTheHeck + 1
                             }
@@ -368,13 +281,13 @@ gameSummary { completedSheets } =
 
         finalScore : Int
         finalScore =
-            scoreToPoints Perfect
+            scoreToPoints Math.Perfect
                 * scoreRecord.perfect
-                + scoreToPoints PrettyGood
+                + scoreToPoints Math.PrettyGood
                 * scoreRecord.prettyGood
-                + scoreToPoints Sure
+                + scoreToPoints Math.Sure
                 * scoreRecord.sure
-                + scoreToPoints WhatTheHeck
+                + scoreToPoints Math.WhatTheHeck
                 * scoreRecord.whatTheHeck
     in
     { scoreCounts = scoreRecord
@@ -398,8 +311,13 @@ allQuestionsAnswered { currentSheet } =
 
 addAnswer : Game -> Random.Generator Game
 addAnswer game =
+    let
+        questionTypeStats : Math.QuestionTypeStats
+        questionTypeStats =
+            getStats game.gameType
+    in
     Random.map
         (\answer ->
             { game | answers = List.append game.answers [ answer ] }
         )
-        (answerGenerator game.gameType)
+        questionTypeStats.answerGenerator

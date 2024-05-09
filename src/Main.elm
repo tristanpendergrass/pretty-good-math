@@ -11,6 +11,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Events.Extra.Pointer as Pointer
 import Json.Decode as D
+import Math
 import Random
 import Task
 import ThinkingSvg exposing (thinkingSvg)
@@ -105,7 +106,7 @@ update msg model =
                 MainMenu seed gameType ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step (Game.newGameGenerator Game.GameMultiplication) seed
+                            Random.step (Game.newGameGenerator gameType) seed
                     in
                     ( GameStarted newSeed gameType newGame Nothing, Cmd.none )
 
@@ -376,21 +377,21 @@ mainMenuView gameType =
         ]
 
 
-renderScore : Game.Score -> Html Msg
+renderScore : Math.Score -> Html Msg
 renderScore score =
     let
         ( scoreText, badgeClass ) =
             case score of
-                Game.Perfect ->
+                Math.Perfect ->
                     ( "Perfect", class "badge-success" )
 
-                Game.PrettyGood ->
+                Math.PrettyGood ->
                     ( "Pretty Good", class "badge-info" )
 
-                Game.Sure ->
+                Math.Sure ->
                     ( "Sure", class "badge-warning" )
 
-                Game.WhatTheHeck ->
+                Math.WhatTheHeck ->
                     ( "What the heck?", class "badge-error" )
     in
     div [ class "badge animate-fadeInUp", badgeClass ]
@@ -400,10 +401,10 @@ renderScore score =
 gameView : Game -> Maybe DragData -> Html Msg
 gameView game maybeDragData =
     let
-        renderQuestion : Int -> Game.Question -> Html Msg
+        renderQuestion : Int -> Math.Question -> Html Msg
         renderQuestion index question =
             case question of
-                Game.QuestionAddition left right ->
+                Math.Addition left right ->
                     div
                         [ class "h-12 flex items-center gap-2"
                         ]
@@ -417,7 +418,7 @@ gameView game maybeDragData =
                         , span [] [ text "=" ]
                         ]
 
-                Game.QuestionMultiplication left right ->
+                Math.Multiplication left right ->
                     div
                         [ class "h-12 flex items-center gap-2"
                         ]
@@ -489,7 +490,7 @@ gameView game maybeDragData =
                             [ renderQuestion questionIndex question
                             , span [ class "font-bold" ] [ text (String.fromInt answer) ]
                             ]
-                        , div [ class "opacity" ] [ renderScore (Game.scoreQuestion question answer) ]
+                        , div [ class "opacity" ] [ renderScore (Math.scoreQuestion question answer) ]
                         ]
 
         answerDimensionClass : Attribute Msg
@@ -642,12 +643,12 @@ gameOverView completedGame =
         ]
 
 
-scoresForTable : List ( Game.Score, Int, Maybe Int )
+scoresForTable : List ( Math.Score, Int, Maybe Int )
 scoresForTable =
-    [ ( Game.Perfect, Game.scoreToPoints Game.Perfect, Just 0 )
-    , ( Game.PrettyGood, Game.scoreToPoints Game.PrettyGood, Just config.prettyGoodMargin )
-    , ( Game.Sure, Game.scoreToPoints Game.Sure, Just config.sureMargin )
-    , ( Game.WhatTheHeck, Game.scoreToPoints Game.WhatTheHeck, Nothing )
+    [ ( Math.Perfect, Game.scoreToPoints Math.Perfect, Just 0 )
+    , ( Math.PrettyGood, Game.scoreToPoints Math.PrettyGood, Just config.prettyGoodMargin )
+    , ( Math.Sure, Game.scoreToPoints Math.Sure, Just config.sureMargin )
+    , ( Math.WhatTheHeck, Game.scoreToPoints Math.WhatTheHeck, Nothing )
     ]
 
 
