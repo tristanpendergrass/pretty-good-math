@@ -14,7 +14,13 @@ import Random
 
 type GameType
     = GameAddition
+    | GameAdditionBig
     | GameMultiplication
+
+
+gameTypes : List GameType
+gameTypes =
+    [ GameAddition, GameAdditionBig, GameMultiplication ]
 
 
 type alias Answer =
@@ -50,6 +56,9 @@ getStats gameType =
     case gameType of
         GameAddition ->
             Math.additionStats
+
+        GameAdditionBig ->
+            Math.additionBigStats
 
         GameMultiplication ->
             Math.multiplicationStats

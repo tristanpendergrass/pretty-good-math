@@ -344,36 +344,33 @@ mainMenuView gameType =
             , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
             ]
         , div [ class "flex items-center gap-4" ]
-            [ label
-                [ class "flex items-center gap-1 cursor-pointer"
-                , Pointer.onDown (\_ -> HandleGameTypeClick Game.GameAddition)
-                ]
-                [ text "Addition"
-                , input
-                    [ type_ "radio"
-                    , class "radio"
-                    , checked (gameType == Game.GameAddition)
-                    ]
-                    []
-                ]
-            , label
-                [ class "flex items-center gap-1 cursor-pointer"
-                , Pointer.onDown (\_ -> HandleGameTypeClick Game.GameMultiplication)
-                ]
-                [ text "Multiplication"
-                , input
-                    [ type_ "radio"
-                    , class "radio"
-                    , checked (gameType == Game.GameMultiplication)
-                    ]
-                    []
-                ]
-            ]
+            (Game.gameTypes
+                |> List.map
+                    (\gt ->
+                        let
+                            questionTypeStats : Math.QuestionTypeStats
+                            questionTypeStats =
+                                Game.getStats gt
+                        in
+                        label
+                            [ class "flex items-center gap-1 cursor-pointer"
+                            , Pointer.onDown (\_ -> HandleGameTypeClick gt)
+                            ]
+                            [ text questionTypeStats.title
+                            , input
+                                [ type_ "radio"
+                                , class "radio"
+                                , checked (gameType == gt)
+                                ]
+                                []
+                            ]
+                    )
+            )
         , button [ class "btn btn-primary px-16", onClick HandleStartGameClick ] [ text "Start!" ]
         , div [ class "divider" ] []
         , div [ class "prose prose-sm md:prose-base" ] [ h2 [] [ text "Grading" ] ]
         , div [ class "prose prose-sm md:prose-base" ] [ p [] [ text "Passing: ", strong [] [ text (String.fromInt config.passPoints) ], text " points" ] ]
-        , renderRubric
+        , renderRubric gameType
         ]
 
 
@@ -405,6 +402,20 @@ gameView game maybeDragData =
         renderQuestion index question =
             case question of
                 Math.Addition left right ->
+                    div
+                        [ class "h-12 flex items-center gap-2"
+                        ]
+                        [ span [] [ text (String.fromInt left) ]
+                        , span []
+                            [ FeatherIcons.plus
+                                |> FeatherIcons.withSize 16
+                                |> FeatherIcons.toHtml []
+                            ]
+                        , span [] [ text (String.fromInt right) ]
+                        , span [] [ text "=" ]
+                        ]
+
+                Math.AdditionBig left right ->
                     div
                         [ class "h-12 flex items-center gap-2"
                         ]
@@ -585,8 +596,7 @@ gameView game maybeDragData =
         [ div [ class "flex justify-center items-center relative" ]
             [ renderTimer
             , div [ class "flex items-center gap-8 h-full absolute top-0 right-0" ]
-                [ button [ class "btn btn-sm btn-outline", onClick HandleStartOverClick ] [ text "Start Over" ]
-                , button [ class "btn btn-sm btn-error", onClick HandleGiveUpClick ] [ text "Give up" ]
+                [ button [ class "btn btn-sm btn-error", onClick HandleGiveUpClick ] [ text "Give up" ]
                 ]
             ]
         , div [ class "w-full grid grid-cols-2 gap-4" ]
@@ -611,8 +621,8 @@ gameView game maybeDragData =
         ]
 
 
-gameOverView : CompletedGame -> Html Msg
-gameOverView completedGame =
+gameOverView : Game.GameType -> CompletedGame -> Html Msg
+gameOverView gameType completedGame =
     let
         gameSummary : Game.GameSummary
         gameSummary =
@@ -625,7 +635,7 @@ gameOverView completedGame =
     div [ class "w-full flex justify-center", class "animate-fadeInUp" ]
         [ div [ class "max-w-3xl shadow-xl rounded flex flex-col gap-4 lg:gap-16 p-12 items-center overflow-hidden" ]
             [ div [ class "prose prose-sm md:prose-base" ] [ h1 [] [ text "Results" ] ]
-            , div [] [ renderGameSummary gameSummary ]
+            , div [] [ renderGameSummary gameType gameSummary ]
             , div [ class "prose prose-sm md:prose-base" ]
                 [ text "Final Score: "
                 , strong [] [ text (String.fromInt gameSummary.finalScore) ]
@@ -643,17 +653,22 @@ gameOverView completedGame =
         ]
 
 
-scoresForTable : List ( Math.Score, Int, Maybe Int )
-scoresForTable =
+scoresForTable : Game.GameType -> List ( Math.Score, Int, Maybe Int )
+scoresForTable questionType =
+    let
+        questionTypeStats : Math.QuestionTypeStats
+        questionTypeStats =
+            Game.getStats questionType
+    in
     [ ( Math.Perfect, Game.scoreToPoints Math.Perfect, Just 0 )
-    , ( Math.PrettyGood, Game.scoreToPoints Math.PrettyGood, Just config.prettyGoodMargin )
-    , ( Math.Sure, Game.scoreToPoints Math.Sure, Just config.sureMargin )
+    , ( Math.PrettyGood, Game.scoreToPoints Math.PrettyGood, Just questionTypeStats.margins.prettyGood )
+    , ( Math.Sure, Game.scoreToPoints Math.Sure, Just questionTypeStats.margins.sure )
     , ( Math.WhatTheHeck, Game.scoreToPoints Math.WhatTheHeck, Nothing )
     ]
 
 
-renderRubric : Html Msg
-renderRubric =
+renderRubric : Game.GameType -> Html Msg
+renderRubric gameType =
     table [ class "table w-[500px]" ]
         [ thead []
             [ tr []
@@ -663,7 +678,7 @@ renderRubric =
                 ]
             ]
         , tbody []
-            (scoresForTable
+            (scoresForTable gameType
                 |> List.map
                     (\( score, points, maybeMargin ) ->
                         tr []
@@ -684,8 +699,8 @@ renderRubric =
         ]
 
 
-renderGameSummary : Game.GameSummary -> Html Msg
-renderGameSummary gameSummary =
+renderGameSummary : Game.GameType -> Game.GameSummary -> Html Msg
+renderGameSummary gameType gameSummary =
     table [ class "table w-[500px]" ]
         [ thead []
             [ tr []
@@ -696,7 +711,7 @@ renderGameSummary gameSummary =
                 ]
             ]
         , tbody []
-            (scoresForTable
+            (scoresForTable gameType
                 |> List.map
                     (\( score, points, _ ) ->
                         let
@@ -754,6 +769,6 @@ view model =
             GameStarted _ _ game maybeDragData ->
                 gameView game maybeDragData
 
-            GameOver _ _ completedGame ->
-                gameOverView completedGame
+            GameOver _ gameType completedGame ->
+                gameOverView gameType completedGame
         ]
