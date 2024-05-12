@@ -24,7 +24,7 @@ $ npm start -- If on Mac, use npm start-mac
 [x] Fix drag an drop
 [x] Generate answers over time
 [x] Move menu buttons from top center to far right or something
-[ ] Test at screen size 1643px. The "What the heck" is wrapping
+[x] Test at screen size 1643px. The "What the heck" is wrapping
 [x] Add ability to toggle between addition and multiplication
 [x] Add big addition
 [x] Add big multiplication
@@ -32,7 +32,8 @@ $ npm start -- If on Mac, use npm start-mac
   [ ] Remove Count column and show same data in Score column like "Perfect x10"
   [ ] Move Result to top of area
   [ ] Apply fade in animation to final result
-[ ] Add high score system saved in local storage and keyed to test type
+[ ] Lock "Big" modes behind passing the normal version first
+[ ] Add score system showing your highest earned score
 [ ] Store selected game type in local storage
 [ ] Initialize seed from random number
 [ ] Validate on touch screen

@@ -579,7 +579,7 @@ gameView game maybeDragData =
 
         sheetStyles : Attribute Msg
         sheetStyles =
-            class "w-[350px] h-[440px] bg-base-100 absolute shadow-xl bg-base-100 border border-gray-500"
+            class "w-[355px] h-[440px] bg-base-100 absolute shadow-xl bg-base-100 border border-gray-500"
 
         placeholderSheet : Int -> Html Msg
         placeholderSheet index =
