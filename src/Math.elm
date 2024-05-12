@@ -12,6 +12,7 @@ type Question
     = Addition Int Int
     | AdditionBig Int Int
     | Multiplication Int Int
+    | MultiplicationBig Int Int
 
 
 type Score
@@ -80,6 +81,23 @@ scoreQuestion question answer =
                 PrettyGood
 
             else if abs (answer - correctAnswer) <= multiplicationStats.margins.sure then
+                Sure
+
+            else
+                WhatTheHeck
+
+        MultiplicationBig left right ->
+            let
+                correctAnswer =
+                    left * right
+            in
+            if answer == correctAnswer then
+                Perfect
+
+            else if abs (answer - correctAnswer) <= multiplicationBigStats.margins.prettyGood then
+                PrettyGood
+
+            else if abs (answer - correctAnswer) <= multiplicationBigStats.margins.sure then
                 Sure
 
             else
@@ -185,4 +203,60 @@ multiplicationStats =
                 Random.int config.multiplicandLowerBound config.multiplicandUpperBound
         in
         Random.map2 Multiplication multiplicandGenerator multiplicandGenerator
+    }
+
+
+
+-- MultiplicationBig
+
+
+multiplicationBigAnswers : ( Int, List Int )
+multiplicationBigAnswers =
+    let
+        reduceFn : Int -> List Int -> List Int
+        reduceFn m accum =
+            List.range config.multiplicandBigUpperLowerBound config.multiplicandBigUpperUpperBound
+                |> List.map ((*) m)
+                |> List.append accum
+    in
+    List.range config.multiplicandBigLowerLowerBound config.multiplicandBigLowerUpperBound
+        |> List.foldl reduceFn []
+        |> (\res ->
+                let
+                    rest : List Int
+                    rest =
+                        List.drop 1 res
+
+                    first : Int
+                    first =
+                        config.multiplicandBigUpperLowerBound * config.multiplicandBigUpperLowerBound
+                in
+                ( first, rest )
+           )
+
+
+multiplicationBigStats : QuestionTypeStats
+multiplicationBigStats =
+    { title = "Big Multiplication"
+    , margins =
+        { prettyGood = config.multiplicationBigAnswerMargins.prettyGood
+        , sure = config.multiplicationBigAnswerMargins.sure
+        }
+    , answerGenerator =
+        let
+            ( firstAnswer, restAnswers ) =
+                multiplicationBigAnswers
+        in
+        Random.uniform firstAnswer restAnswers
+    , questionGenerator =
+        let
+            multiplicandBigLowerGenerator : Random.Generator Int
+            multiplicandBigLowerGenerator =
+                Random.int config.multiplicandBigLowerLowerBound config.multiplicandBigLowerUpperBound
+
+            multiplicandBigUpperGenerator : Random.Generator Int
+            multiplicandBigUpperGenerator =
+                Random.int config.multiplicandBigUpperLowerBound config.multiplicandBigUpperUpperBound
+        in
+        Random.map2 MultiplicationBig multiplicandBigLowerGenerator multiplicandBigUpperGenerator
     }

@@ -16,11 +16,12 @@ type GameType
     = GameAddition
     | GameAdditionBig
     | GameMultiplication
+    | GameMultiplicationBig
 
 
 gameTypes : List GameType
 gameTypes =
-    [ GameAddition, GameAdditionBig, GameMultiplication ]
+    [ GameAddition, GameAdditionBig, GameMultiplication, GameMultiplicationBig ]
 
 
 type alias Answer =
@@ -62,6 +63,9 @@ getStats gameType =
 
         GameMultiplication ->
             Math.multiplicationStats
+
+        GameMultiplicationBig ->
+            Math.multiplicationBigStats
 
 
 

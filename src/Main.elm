@@ -443,6 +443,20 @@ gameView game maybeDragData =
                         , span [] [ text "=" ]
                         ]
 
+                Math.MultiplicationBig left right ->
+                    div
+                        [ class "h-12 flex items-center gap-2"
+                        ]
+                        [ span [] [ text (String.fromInt left) ]
+                        , span []
+                            [ FeatherIcons.x
+                                |> FeatherIcons.withSize 16
+                                |> FeatherIcons.toHtml []
+                            ]
+                        , span [] [ text (String.fromInt right) ]
+                        , span [] [ text "=" ]
+                        ]
+
         renderQuestionAnswerPair : Int -> Game.QuestionAnswerPair -> Html Msg
         renderQuestionAnswerPair questionIndex questionAnswer =
             let

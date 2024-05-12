@@ -27,9 +27,13 @@ $ npm start -- If on Mac, use npm start-mac
 [ ] Test at screen size 1643px. The "What the heck" is wrapping
 [x] Add ability to toggle between addition and multiplication
 [x] Add big addition
-[ ] Add big multiplication
+[x] Add big multiplication
 [ ] Update score sheet
   [ ] Remove Count column and show same data in Score column like "Perfect x10"
   [ ] Move Result to top of area
   [ ] Apply fade in animation to final result
 [ ] Add high score system saved in local storage and keyed to test type
+[ ] Store selected game type in local storage
+[ ] Initialize seed from random number
+[ ] Validate on touch screen
+[ ] Playtest
