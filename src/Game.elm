@@ -280,12 +280,12 @@ gameSummary { completedSheets } =
 
                         Math.Sure ->
                             { accum
-                                | perfect = accum.sure + 1
+                                | sure = accum.sure + 1
                             }
 
                         Math.WhatTheHeck ->
                             { accum
-                                | perfect = accum.whatTheHeck + 1
+                                | whatTheHeck = accum.whatTheHeck + 1
                             }
 
         scoreRecord : ScoreRecord Int

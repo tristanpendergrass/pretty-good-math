@@ -28,10 +28,9 @@ $ npm start -- If on Mac, use npm start-mac
 [x] Add ability to toggle between addition and multiplication
 [x] Add big addition
 [x] Add big multiplication
-[ ] Update score sheet
-  [ ] Remove Count column and show same data in Score column like "Perfect x10"
-  [ ] Move Result to top of area
-  [ ] Apply fade in animation to final result
+[x] Update score sheet
+  [x] Remove Count column and show same data in Score column like "Perfect x10"
+  [x] Apply fade in animation to final result
 [ ] Lock "Big" modes behind passing the normal version first
 [ ] Add score system showing your highest earned score
 [ ] Store selected game type in local storage

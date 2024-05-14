@@ -645,10 +645,15 @@ gameOverView gameType completedGame =
         playerWon : Bool
         playerWon =
             gameSummary.finalScore >= config.passPoints
+
+        questionTypeStats : Math.QuestionTypeStats
+        questionTypeStats =
+            Game.getStats gameType
     in
     div [ class "w-full flex justify-center", class "animate-fadeInUp" ]
         [ div [ class "max-w-3xl shadow-xl rounded flex flex-col gap-4 lg:gap-16 p-12 items-center overflow-hidden" ]
             [ div [ class "prose prose-sm md:prose-base" ] [ h1 [] [ text "Results" ] ]
+            , div [ class "prose prose-sm md:prose-base" ] [ p [] [ text "Test type: ", strong [] [ text questionTypeStats.title ] ] ]
             , div [] [ renderGameSummary gameType gameSummary ]
             , div [ class "prose prose-sm md:prose-base" ]
                 [ text "Final Score: "
@@ -658,10 +663,10 @@ gameOverView gameType completedGame =
                 , text " points"
                 ]
             , if playerWon then
-                div [ class "bg-success/50 text-success-content p-4 rounded border-2 border-success" ] [ text "Result: You passed!" ]
+                div [ class "bg-success/50 text-success-content p-4 rounded border-2 border-success animate-popWiggle" ] [ text "Result: You passed!" ]
 
               else
-                div [ class "bg-error/50 text-success-error p-4 rounded border-2 border-error" ] [ text "Result: Failed to pass" ]
+                div [ class "bg-error/50 text-success-error p-4 rounded border-2 border-error animate-popWiggle" ] [ text "Result: Failed to pass" ]
             , div [ class "w-full flex justify-center items-center" ] [ button [ class "btn btn-primary", onClick HandleMainMenuClick ] [ text "Main Menu" ] ]
             ]
         ]
@@ -720,7 +725,6 @@ renderGameSummary gameType gameSummary =
             [ tr []
                 [ th [] [ text "Score" ]
                 , th [] [ text "Points" ]
-                , th [] [ text "Count" ]
                 , th [] [ text "Subtotal" ]
                 ]
             ]
@@ -738,9 +742,14 @@ renderGameSummary gameType gameSummary =
                                 Game.scoreToPoints score * count
                         in
                         tr []
-                            [ td [] [ renderScore score ]
+                            [ td [ class "flex items-center gap-1" ]
+                                [ renderScore score
+                                , span [ class "flex items-center gap-1 text-opacity-50" ]
+                                    [ FeatherIcons.x |> FeatherIcons.withSize 16 |> FeatherIcons.toHtml []
+                                    , text (String.fromInt count)
+                                    ]
+                                ]
                             , td [] [ text (String.fromInt points) ]
-                            , td [] [ text (String.fromInt count) ]
                             , td [ class "font-semibold" ] [ text (String.fromInt subtotal) ]
                             ]
                     )
