@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Browser
 import Browser.Dom
@@ -11,15 +11,45 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Events.Extra.Pointer as Pointer
 import Json.Decode as D
+import Json.Encode as E
 import Math
 import Random
 import Task
 import ThinkingSvg exposing (thinkingSvg)
 
 
-main : Program () Model Msg
+port saveScores : E.Value -> Cmd msg
+
+
+type alias Flags =
+    { initialSeed : Int, highScores : HighScores }
+
+
+main : Program Flags Model Msg
 main =
     Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
+
+
+encodeHighScore : Maybe Int -> E.Value
+encodeHighScore maybeScore =
+    case maybeScore of
+        Just score ->
+            E.int score
+
+        Nothing ->
+            E.null
+
+
+saveHighScores : HighScores -> Cmd msg
+saveHighScores scores =
+    saveScores
+        (E.object
+            [ ( "addition", encodeHighScore scores.addition )
+            , ( "additionBig", encodeHighScore scores.additionBig )
+            , ( "multiplication", encodeHighScore scores.multiplication )
+            , ( "multiplicationBig", encodeHighScore scores.multiplicationBig )
+            ]
+        )
 
 
 
@@ -38,20 +68,57 @@ type alias DragData =
     }
 
 
-type Model
-    = MainMenu Random.Seed Game.GameType
-    | GameStarted Random.Seed Game.GameType Game (Maybe DragData)
-    | GameOver Random.Seed Game.GameType CompletedGame
+type alias HighScores =
+    { addition : Maybe Int, additionBig : Maybe Int, multiplication : Maybe Int, multiplicationBig : Maybe Int }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( MainMenu (Random.initialSeed 0) Game.GameAddition, Cmd.none )
+type alias Model =
+    { seed : Random.Seed
+    , gameState : GameState
+    , gameType : Game.GameType
+    , highScores : HighScores
+    }
+
+
+type GameState
+    = MainMenu
+    | GameStarted Game (Maybe DragData)
+    | GameOver CompletedGame
+
+
+init : Flags -> ( Model, Cmd Msg )
+init { initialSeed, highScores } =
+    ( { seed = Random.initialSeed initialSeed
+      , highScores = highScores
+      , gameState = MainMenu
+      , gameType = Game.GameAddition
+      }
+    , Cmd.none
+    )
 
 
 
 -- UPDATE
--- { touches : [ { clientX : Float, clientY : Float } ] }
+
+
+additionBigUnlocked : HighScores -> Bool
+additionBigUnlocked highScores =
+    case highScores.addition of
+        Just score ->
+            score >= config.grades.b
+
+        Nothing ->
+            False
+
+
+multiplicationBigUnlocked : HighScores -> Bool
+multiplicationBigUnlocked highScores =
+    case highScores.multiplication of
+        Just score ->
+            score >= config.grades.b
+
+        Nothing ->
+            False
 
 
 type Msg
@@ -73,6 +140,58 @@ type Msg
     | HandleGameTypeClick Game.GameType
 
 
+updateHighScores : Game.GameType -> Int -> HighScores -> HighScores
+updateHighScores gameType finalScore highScores =
+    case gameType of
+        Game.GameAddition ->
+            case highScores.addition of
+                Just additionHighScore ->
+                    if finalScore > additionHighScore then
+                        { highScores | addition = Just finalScore }
+
+                    else
+                        highScores
+
+                Nothing ->
+                    { highScores | addition = Just finalScore }
+
+        Game.GameAdditionBig ->
+            case highScores.additionBig of
+                Just additionBigHighScore ->
+                    if finalScore > additionBigHighScore then
+                        { highScores | additionBig = Just finalScore }
+
+                    else
+                        highScores
+
+                Nothing ->
+                    { highScores | additionBig = Just finalScore }
+
+        Game.GameMultiplication ->
+            case highScores.multiplication of
+                Just multiplicationHighScore ->
+                    if finalScore > multiplicationHighScore then
+                        { highScores | multiplication = Just finalScore }
+
+                    else
+                        highScores
+
+                Nothing ->
+                    { highScores | multiplication = Just finalScore }
+
+        Game.GameMultiplicationBig ->
+            case highScores.multiplicationBig of
+                Just multiplicationBigHighScore ->
+                    if finalScore > multiplicationBigHighScore then
+                        { highScores | multiplicationBig = Just finalScore }
+
+                    else
+                        highScores
+
+                Nothing ->
+                    { highScores | multiplicationBig = Just finalScore }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -85,62 +204,87 @@ update msg model =
             ( model, Cmd.none )
 
         HandleAnimationFrameDelta delta ->
-            case model of
-                GameStarted seed gameType game dragData ->
+            case model.gameState of
+                GameStarted game dragData ->
                     case Game.handleAnimationFrameDelta delta game of
                         Game.GameContinues newGameGenerator ->
                             let
                                 ( newGame, newSeed ) =
-                                    Random.step newGameGenerator seed
+                                    Random.step newGameGenerator model.seed
                             in
-                            ( GameStarted newSeed gameType newGame dragData, Cmd.none )
+                            ( { model | seed = newSeed, gameState = GameStarted newGame dragData }, Cmd.none )
 
                         Game.GameEnded completedGame ->
-                            ( GameOver seed gameType completedGame, Cmd.none )
+                            let
+                                gameSummary : Game.GameSummary
+                                gameSummary =
+                                    Game.gameSummary completedGame
+
+                                highScores : HighScores
+                                highScores =
+                                    model.highScores
+                            in
+                            ( { model | gameState = GameOver completedGame }, saveHighScores (updateHighScores model.gameType gameSummary.finalScore highScores) )
 
                 _ ->
                     noOp
 
         HandleStartGameClick ->
-            case model of
-                MainMenu seed gameType ->
+            case model.gameState of
+                MainMenu ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step (Game.newGameGenerator gameType) seed
+                            Random.step (Game.newGameGenerator model.gameType) model.seed
+
+                        canStartGame : Bool
+                        canStartGame =
+                            case model.gameType of
+                                Game.GameAdditionBig ->
+                                    additionBigUnlocked model.highScores
+
+                                Game.GameMultiplicationBig ->
+                                    multiplicationBigUnlocked model.highScores
+
+                                _ ->
+                                    True
                     in
-                    ( GameStarted newSeed gameType newGame Nothing, Cmd.none )
+                    if canStartGame then
+                        ( { model | seed = newSeed, gameState = GameStarted newGame Nothing }, Cmd.none )
+
+                    else
+                        noOp
 
                 _ ->
                     noOp
 
         HandleAnswerInput questionIndex answer ->
-            case model of
-                GameStarted seed gameType game dragData ->
+            case model.gameState of
+                GameStarted game dragData ->
                     let
                         newGame : Game
                         newGame =
                             Game.answerQuestion questionIndex answer game
                     in
-                    ( GameStarted seed gameType newGame dragData, Cmd.none )
+                    ( { model | gameState = GameStarted newGame dragData }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleNextSheetClick ->
-            case model of
-                GameStarted seed gameType game dragData ->
+            case model.gameState of
+                GameStarted game dragData ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step (Game.goNextSheetGenerator game) seed
+                            Random.step (Game.goNextSheetGenerator game) model.seed
                     in
-                    ( GameStarted newSeed gameType newGame dragData, Cmd.none )
+                    ( { model | seed = newSeed, gameState = GameStarted newGame dragData }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerDownAnswer index event element ->
-            case model of
-                GameStarted seed gameType game _ ->
+            case model.gameState of
+                GameStarted game _ ->
                     let
                         ( pointerX, pointerY ) =
                             event.pointer.clientPos
@@ -159,61 +303,61 @@ update msg model =
                         newDragData =
                             { draggedAnswer = index, draggedOverQuestion = Nothing, mouseCoords = coords, offset = offset }
                     in
-                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
+                    ( { model | gameState = GameStarted game (Just newDragData) }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerEnterQuestion index ->
-            case model of
-                GameStarted seed gameType game (Just dragData) ->
+            case model.gameState of
+                GameStarted game (Just dragData) ->
                     let
                         newDragData : DragData
                         newDragData =
                             { dragData | draggedOverQuestion = Just index }
                     in
-                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
+                    ( { model | gameState = GameStarted game (Just newDragData) }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerLeaveQuestion _ ->
-            case model of
-                GameStarted seed gameType game (Just dragData) ->
+            case model.gameState of
+                GameStarted game (Just dragData) ->
                     let
                         newDragData : DragData
                         newDragData =
                             { dragData | draggedOverQuestion = Nothing }
                     in
-                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
+                    ( { model | gameState = GameStarted game (Just newDragData) }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerUpQuestion index ->
-            case model of
-                GameStarted seed gameType game (Just dragData) ->
+            case model.gameState of
+                GameStarted game (Just dragData) ->
                     let
                         newGame : Game
                         newGame =
                             Game.answerQuestion index dragData.draggedAnswer game
                     in
-                    ( GameStarted seed gameType newGame Nothing, Cmd.none )
+                    ( { model | gameState = GameStarted newGame Nothing }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerUpWindow ->
-            case model of
-                GameStarted seed gameType game _ ->
-                    ( GameStarted seed gameType game Nothing, Cmd.none )
+            case model.gameState of
+                GameStarted game _ ->
+                    ( { model | gameState = GameStarted game Nothing }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandlePointerMove event ->
-            case model of
-                GameStarted seed gameType game (Just dragData) ->
+            case model.gameState of
+                GameStarted game (Just dragData) ->
                     let
                         ( clientX, clientY ) =
                             event.pointer.clientPos
@@ -226,45 +370,51 @@ update msg model =
                         newDragData =
                             { dragData | mouseCoords = coords }
                     in
-                    ( GameStarted seed gameType game (Just newDragData), Cmd.none )
+                    ( { model | gameState = GameStarted game (Just newDragData) }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleStartOverClick ->
-            case model of
-                GameStarted seed gameType game _ ->
+            case model.gameState of
+                GameStarted game _ ->
                     let
                         ( newGame, newSeed ) =
-                            Random.step (Game.newGameGenerator game.gameType) seed
+                            Random.step (Game.newGameGenerator game.gameType) model.seed
                     in
-                    ( GameStarted newSeed gameType newGame Nothing, Cmd.none )
+                    ( { model | seed = newSeed, gameState = GameStarted newGame Nothing }, Cmd.none )
 
                 _ ->
                     noOp
 
         HandleGiveUpClick ->
-            case model of
-                GameStarted seed gameType game _ ->
-                    ( GameOver seed gameType (Game.completeGame game), Cmd.none )
+            case model.gameState of
+                GameStarted game _ ->
+                    let
+                        completedGame : Game.CompletedGame
+                        completedGame =
+                            Game.completeGame game
+
+                        gameSummary : Game.GameSummary
+                        gameSummary =
+                            Game.gameSummary completedGame
+
+                        highScores : HighScores
+                        highScores =
+                            model.highScores
+
+                        newHighScores : HighScores
+                        newHighScores =
+                            updateHighScores model.gameType gameSummary.finalScore highScores
+                                |> Debug.log "foobar newHighScores"
+                    in
+                    ( { model | gameState = GameOver completedGame, highScores = newHighScores }, saveHighScores newHighScores )
 
                 _ ->
                     noOp
 
         HandleMainMenuClick ->
-            let
-                ( newSeed, gameType ) =
-                    case model of
-                        MainMenu seed g ->
-                            ( seed, g )
-
-                        GameStarted seed g _ _ ->
-                            ( seed, g )
-
-                        GameOver seed g _ ->
-                            ( seed, g )
-            in
-            ( MainMenu newSeed gameType, Cmd.none )
+            ( { model | gameState = MainMenu }, Cmd.none )
 
         WithElement id messageNeedingElement ->
             let
@@ -279,9 +429,9 @@ update msg model =
             )
 
         HandleGameTypeClick gameType ->
-            case model of
-                MainMenu seed _ ->
-                    ( MainMenu seed gameType, Cmd.none )
+            case model.gameState of
+                MainMenu ->
+                    ( { model | gameType = gameType }, Cmd.none )
 
                 _ ->
                     noOp
@@ -321,15 +471,69 @@ answerId index =
     "answer-" ++ String.fromInt index
 
 
-mainMenuView : Game.GameType -> Html Msg
-mainMenuView gameType =
+proseClass : Attribute msg
+proseClass =
+    class "prose prose-sm md:prose-base"
+
+
+mainMenuView : Model -> Html Msg
+mainMenuView model =
     let
         prettyGood : Html Msg
         prettyGood =
             div [ class "badge badge-info" ] [ text "Pretty Good" ]
+
+        maybeHighScore : Maybe Int
+        maybeHighScore =
+            case model.gameType of
+                Game.GameAddition ->
+                    model.highScores.addition
+
+                Game.GameAdditionBig ->
+                    model.highScores.additionBig
+
+                Game.GameMultiplication ->
+                    model.highScores.multiplication
+
+                Game.GameMultiplicationBig ->
+                    model.highScores.multiplicationBig
+
+        highGrade : String
+        highGrade =
+            case maybeHighScore of
+                Nothing ->
+                    "N/A"
+
+                Just highScore ->
+                    if highScore >= config.grades.a then
+                        "A"
+
+                    else if highScore >= config.grades.b then
+                        "B"
+
+                    else if highScore >= config.grades.c then
+                        "C"
+
+                    else if highScore >= config.grades.d then
+                        "D"
+
+                    else
+                        "F"
+
+        canStartGame : Bool
+        canStartGame =
+            case model.gameType of
+                Game.GameAdditionBig ->
+                    additionBigUnlocked model.highScores
+
+                Game.GameMultiplicationBig ->
+                    multiplicationBigUnlocked model.highScores
+
+                _ ->
+                    True
     in
-    div [ class "w-full h-full flex flex-col gap-4 lg:gap-16 items-center" ]
-        [ div [ class "prose prose-sm md:prose-base" ]
+    div [ class "w-full h-full flex flex-col gap-4 lg:gap-12 items-center" ]
+        [ div [ proseClass ]
             [ h1 [ class "flex items-center text-2xl" ]
                 [ span [ class "font-bold" ] [ text "Pretty Good Math v3" ]
                 ]
@@ -360,17 +564,29 @@ mainMenuView gameType =
                             , input
                                 [ type_ "radio"
                                 , class "radio"
-                                , checked (gameType == gt)
+                                , checked (model.gameType == gt)
                                 ]
                                 []
                             ]
                     )
             )
-        , button [ class "btn btn-primary px-16", onClick HandleStartGameClick ] [ text "Start!" ]
-        , div [ class "divider" ] []
-        , div [ class "prose prose-sm md:prose-base" ] [ h2 [] [ text "Grading" ] ]
-        , div [ class "prose prose-sm md:prose-base" ] [ p [] [ text "Passing: ", strong [] [ text (String.fromInt config.passPoints) ], text " points" ] ]
-        , renderRubric gameType
+        , div [ classList [ ( "hidden", not canStartGame ) ], class "h-[42px]" ]
+            [ strong [ classList [ ( "invisible", highGrade == "N/A" ) ], class "underline border rounded border-black p-2" ] [ text highGrade ]
+            ]
+        , div [ classList [ ( "hidden", canStartGame ) ], class "flex items-center gap-2 h-[42px]" ]
+            [ FeatherIcons.lock
+                |> FeatherIcons.withSize 24
+                |> FeatherIcons.toHtml []
+            , text "Earn"
+            , strong [ class "underline border rounded border-black p-2" ] [ text "B" ]
+            , text "or higher in the previous test"
+            ]
+        , button
+            [ class "btn btn-primary px-16 disabled:cursor-not-allowed"
+            , onClick HandleStartGameClick
+            , disabled (not canStartGame)
+            ]
+            [ text "Start!" ]
         ]
 
 
@@ -762,8 +978,8 @@ view model =
     let
         dragInProgress : Bool
         dragInProgress =
-            case model of
-                GameStarted _ _ _ (Just _) ->
+            case model.gameState of
+                GameStarted _ (Just _) ->
                     True
 
                 _ ->
@@ -785,13 +1001,13 @@ view model =
                     []
                )
         )
-        [ case model of
-            MainMenu _ gameType ->
-                mainMenuView gameType
+        [ case model.gameState of
+            MainMenu ->
+                mainMenuView model
 
-            GameStarted _ _ game maybeDragData ->
+            GameStarted game maybeDragData ->
                 gameView game maybeDragData
 
-            GameOver _ gameType completedGame ->
-                gameOverView gameType completedGame
+            GameOver completedGame ->
+                gameOverView model.gameType completedGame
         ]

@@ -32,6 +32,12 @@ type alias Config =
     , newAnswerTimeSlow : { lowerBound : Float, upperBound : Float }
     , newAnswerTimeFast : { lowerBound : Float, upperBound : Float }
     , maxAnswers : Int
+    , grades :
+        { a : Int
+        , b : Int
+        , c : Int
+        , d : Int
+        }
     }
 
 
@@ -59,6 +65,12 @@ prodConfig =
     , newAnswerTimeSlow = { lowerBound = 2000, upperBound = 3500 }
     , newAnswerTimeFast = { lowerBound = 250, upperBound = 1000 }
     , maxAnswers = 10
+    , grades =
+        { a = 20
+        , b = 15
+        , c = 10
+        , d = 5
+        }
     }
 
 
