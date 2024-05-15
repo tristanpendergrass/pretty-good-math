@@ -406,7 +406,6 @@ update msg model =
                         newHighScores : HighScores
                         newHighScores =
                             updateHighScores model.gameType gameSummary.finalScore highScores
-                                |> Debug.log "foobar newHighScores"
                     in
                     ( { model | gameState = GameOver completedGame, highScores = newHighScores }, saveHighScores newHighScores )
 
