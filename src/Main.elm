@@ -588,7 +588,7 @@ mainMenuView model =
                 |> FeatherIcons.toHtml []
             , text "Earn"
             , renderGrade "B"
-            , text "or higher in the previous test"
+            , text "or higher in the previous test to play"
             ]
         , button
             [ class "btn btn-primary px-16 disabled:cursor-not-allowed"
