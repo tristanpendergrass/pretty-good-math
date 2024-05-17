@@ -28,7 +28,6 @@ type alias Config =
     , questionsPerSheet : Int -- How many questions shown on a single sheet
     , answersPerSheet : Int -- How many answers to generate when showing a new sheet
     , points : { perfect : Int, prettyGood : Int, sure : Int, whatTheHeck : Int }
-    , passPoints : Int
     , newAnswerTimeSlow : { lowerBound : Float, upperBound : Float }
     , newAnswerTimeFast : { lowerBound : Float, upperBound : Float }
     , maxAnswers : Int
@@ -61,7 +60,6 @@ prodConfig =
     , questionsPerSheet = 5
     , answersPerSheet = 5
     , points = { perfect = 3, prettyGood = 2, sure = 1, whatTheHeck = 0 }
-    , passPoints = 20
     , newAnswerTimeSlow = { lowerBound = 2000, upperBound = 3500 }
     , newAnswerTimeFast = { lowerBound = 250, upperBound = 1000 }
     , maxAnswers = 10

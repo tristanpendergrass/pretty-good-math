@@ -235,20 +235,8 @@ update msg model =
                     let
                         ( newGame, newSeed ) =
                             Random.step (Game.newGameGenerator model.gameType) model.seed
-
-                        canStartGame : Bool
-                        canStartGame =
-                            case model.gameType of
-                                Game.GameAdditionBig ->
-                                    additionBigUnlocked model.highScores
-
-                                Game.GameMultiplicationBig ->
-                                    multiplicationBigUnlocked model.highScores
-
-                                _ ->
-                                    True
                     in
-                    if canStartGame then
+                    if canStartGame model.highScores model.gameType then
                         ( { model | seed = newSeed, gameState = GameStarted newGame Nothing }, Cmd.none )
 
                     else
@@ -475,6 +463,58 @@ proseClass =
     class "prose prose-sm md:prose-base"
 
 
+renderGrade : String -> Html msg
+renderGrade grade =
+    strong [ class "underline border rounded border-black p-2" ] [ text grade ]
+
+
+scoreToGrade : Int -> String
+scoreToGrade score =
+    if score >= config.grades.a then
+        "A"
+
+    else if score >= config.grades.b then
+        "B"
+
+    else if score >= config.grades.c then
+        "C"
+
+    else if score >= config.grades.d then
+        "D"
+
+    else
+        "F"
+
+
+getHighScore : HighScores -> Game.GameType -> Maybe Int
+getHighScore highScores gameType =
+    case gameType of
+        Game.GameAddition ->
+            highScores.addition
+
+        Game.GameAdditionBig ->
+            highScores.additionBig
+
+        Game.GameMultiplication ->
+            highScores.multiplication
+
+        Game.GameMultiplicationBig ->
+            highScores.multiplicationBig
+
+
+canStartGame : HighScores -> Game.GameType -> Bool
+canStartGame highScores gameType =
+    case gameType of
+        Game.GameAdditionBig ->
+            additionBigUnlocked highScores
+
+        Game.GameMultiplicationBig ->
+            multiplicationBigUnlocked highScores
+
+        _ ->
+            True
+
+
 mainMenuView : Model -> Html Msg
 mainMenuView model =
     let
@@ -482,54 +522,9 @@ mainMenuView model =
         prettyGood =
             div [ class "badge badge-info" ] [ text "Pretty Good" ]
 
-        maybeHighScore : Maybe Int
-        maybeHighScore =
-            case model.gameType of
-                Game.GameAddition ->
-                    model.highScores.addition
-
-                Game.GameAdditionBig ->
-                    model.highScores.additionBig
-
-                Game.GameMultiplication ->
-                    model.highScores.multiplication
-
-                Game.GameMultiplicationBig ->
-                    model.highScores.multiplicationBig
-
-        highGrade : String
-        highGrade =
-            case maybeHighScore of
-                Nothing ->
-                    "N/A"
-
-                Just highScore ->
-                    if highScore >= config.grades.a then
-                        "A"
-
-                    else if highScore >= config.grades.b then
-                        "B"
-
-                    else if highScore >= config.grades.c then
-                        "C"
-
-                    else if highScore >= config.grades.d then
-                        "D"
-
-                    else
-                        "F"
-
-        canStartGame : Bool
-        canStartGame =
-            case model.gameType of
-                Game.GameAdditionBig ->
-                    additionBigUnlocked model.highScores
-
-                Game.GameMultiplicationBig ->
-                    multiplicationBigUnlocked model.highScores
-
-                _ ->
-                    True
+        canStartSelectedType : Bool
+        canStartSelectedType =
+            canStartGame model.highScores model.gameType
     in
     div [ class "w-full h-full flex flex-col gap-4 lg:gap-12 items-center" ]
         [ div [ proseClass ]
@@ -554,12 +549,30 @@ mainMenuView model =
                             questionTypeStats : Math.QuestionTypeStats
                             questionTypeStats =
                                 Game.getStats gt
+
+                            maybeHighGrade : Maybe String
+                            maybeHighGrade =
+                                getHighScore model.highScores gt
+                                    |> Maybe.map scoreToGrade
+
+                            canStart : Bool
+                            canStart =
+                                canStartGame model.highScores gt
                         in
                         label
-                            [ class "flex items-center gap-1 cursor-pointer"
+                            [ class "flex items-start gap-1 cursor-pointer"
                             , Pointer.onDown (\_ -> HandleGameTypeClick gt)
                             ]
-                            [ text questionTypeStats.title
+                            [ div [ class "flex flex-col items-center gap-1" ]
+                                [ span [] [ text questionTypeStats.title ]
+                                , div [ class "p-2", classList [ ( "invisible", canStart ) ] ] [ FeatherIcons.lock |> FeatherIcons.withSize 24 |> FeatherIcons.toHtml [] ]
+                                , case maybeHighGrade of
+                                    Nothing ->
+                                        div [ class "p-2 invisible" ] [ renderGrade "D" ]
+
+                                    Just highGrade ->
+                                        renderGrade highGrade
+                                ]
                             , input
                                 [ type_ "radio"
                                 , class "radio"
@@ -569,21 +582,18 @@ mainMenuView model =
                             ]
                     )
             )
-        , div [ classList [ ( "hidden", not canStartGame ) ], class "h-[42px]" ]
-            [ strong [ classList [ ( "invisible", highGrade == "N/A" ) ], class "underline border rounded border-black p-2" ] [ text highGrade ]
-            ]
-        , div [ classList [ ( "hidden", canStartGame ) ], class "flex items-center gap-2 h-[42px]" ]
+        , div [ classList [ ( "invisible", canStartSelectedType ) ], class "flex items-center gap-2 h-[42px]" ]
             [ FeatherIcons.lock
                 |> FeatherIcons.withSize 24
                 |> FeatherIcons.toHtml []
             , text "Earn"
-            , strong [ class "underline border rounded border-black p-2" ] [ text "B" ]
+            , renderGrade "B"
             , text "or higher in the previous test"
             ]
         , button
             [ class "btn btn-primary px-16 disabled:cursor-not-allowed"
             , onClick HandleStartGameClick
-            , disabled (not canStartGame)
+            , disabled (not (canStartGame model.highScores model.gameType))
             ]
             [ text "Start!" ]
         ]
@@ -859,7 +869,7 @@ gameOverView gameType completedGame =
 
         playerWon : Bool
         playerWon =
-            gameSummary.finalScore >= config.passPoints
+            gameSummary.finalScore >= config.grades.b
 
         questionTypeStats : Math.QuestionTypeStats
         questionTypeStats =
@@ -874,14 +884,14 @@ gameOverView gameType completedGame =
                 [ text "Final Score: "
                 , strong [] [ text (String.fromInt gameSummary.finalScore) ]
                 , text " / "
-                , strong [] [ text (String.fromInt config.passPoints) ]
+                , strong [] [ text (String.fromInt config.grades.a) ]
                 , text " points"
                 ]
             , if playerWon then
-                div [ class "bg-success/50 text-success-content p-4 rounded border-2 border-success animate-popWiggle" ] [ text "Result: You passed!" ]
+                div [ class "bg-success/50 text-success-content p-8 rounded border-2 border-success animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) ]
 
               else
-                div [ class "bg-error/50 text-success-error p-4 rounded border-2 border-error animate-popWiggle" ] [ text "Result: Failed to pass" ]
+                div [ class "bg-error/50 text-success-error p-8 rounded border-2 border-error animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) ]
             , div [ class "w-full flex justify-center items-center" ] [ button [ class "btn btn-primary", onClick HandleMainMenuClick ] [ text "Main Menu" ] ]
             ]
         ]

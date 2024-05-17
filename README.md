@@ -32,8 +32,8 @@ $ npm start -- If on Mac, use npm start-mac
   [x] Remove Count column and show same data in Score column like "Perfect x10"
   [x] Apply fade in animation to final result
 [ ] Lock "Big" modes behind passing the normal version first
-[ ] Add score system showing your highest earned score
-[ ] Store selected game type in local storage
-[ ] Initialize seed from random number
+[x] Add score system showing your highest earned score
+[x] Store selected game type in local storage
+[x] Initialize seed from random number
 [ ] Validate on touch screen
 [ ] Playtest
