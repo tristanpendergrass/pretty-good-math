@@ -775,6 +775,7 @@ gameView game maybeDragData =
                 [ div
                     ([ answerDimensionClass
                      , class "rounded flex items-center justify-center border border-neutral bg-base-100 animate-fadeInThenFloat"
+                     , Html.Events.preventDefaultOn "touchstart" (D.succeed ( NoOp, True ))
                      , Pointer.onWithOptions "pointerdown"
                         { stopPropagation = False, preventDefault = True }
                         (\event ->
