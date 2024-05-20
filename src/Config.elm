@@ -26,7 +26,6 @@ type alias Config =
     , multiplicationAnswerMargins : { prettyGood : Int, sure : Int }
     , multiplicationBigAnswerMargins : { prettyGood : Int, sure : Int }
     , questionsPerSheet : Int -- How many questions shown on a single sheet
-    , answersPerSheet : Int -- How many answers to generate when showing a new sheet
     , points : { perfect : Int, prettyGood : Int, sure : Int, whatTheHeck : Int }
     , newAnswerTimeSlow : { lowerBound : Float, upperBound : Float }
     , newAnswerTimeFast : { lowerBound : Float, upperBound : Float }
@@ -42,7 +41,7 @@ type alias Config =
 
 prodConfig : Config
 prodConfig =
-    { roundDuration = 60 * 1000
+    { roundDuration = 10 * 1000
     , addendLowerBound = 1
     , addendUpperBound = 10
     , addendBigLowerBound = 10
@@ -58,7 +57,6 @@ prodConfig =
     , multiplicationAnswerMargins = { prettyGood = 2, sure = 4 }
     , multiplicationBigAnswerMargins = { prettyGood = 40, sure = 80 }
     , questionsPerSheet = 5
-    , answersPerSheet = 5
     , points = { perfect = 3, prettyGood = 2, sure = 1, whatTheHeck = 0 }
     , newAnswerTimeSlow = { lowerBound = 2000, upperBound = 3500 }
     , newAnswerTimeFast = { lowerBound = 250, upperBound = 1000 }
@@ -74,7 +72,4 @@ prodConfig =
 
 devConfig : Config
 devConfig =
-    { prodConfig
-        | roundDuration = 1000 * 1000
-        , answersPerSheet = 8
-    }
+    prodConfig
