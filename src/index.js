@@ -27,3 +27,15 @@ document.addEventListener('touchend', (event) => {
   }
   lastTouchEnd = now;
 }, false);
+
+// Prevents a laptop track pad zoom-pinch being interpreted as CTRL/wheel event
+// that will zoom the entire viewport.
+// Google maps uses this technique. The viewport can still be scaled with CTRL/+ and
+// CTRL/-
+window.addEventListener('wheel', event => {
+    const { ctrlKey } = event;
+    if (ctrlKey) {
+        event.preventDefault();
+        return;
+    }
+}, { passive: false });
