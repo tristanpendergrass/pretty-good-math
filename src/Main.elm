@@ -833,6 +833,21 @@ gameView game maybeDragData =
                 (List.indexedMap (\index _ -> placeholderSheet index) game.completedSheets
                     ++ [ renderCurrentSheet ]
                 )
+
+        thinkingImgSrc : String
+        thinkingImgSrc =
+            case game.gameType of
+                Game.GameAddition ->
+                    "thinking_2.png"
+
+                Game.GameAdditionBig ->
+                    "thinking_furrowed.png"
+
+                Game.GameMultiplication ->
+                    "thinking_2.png"
+
+                Game.GameMultiplicationBig ->
+                    "thinking_furrowed.png"
     in
     div [ class "w-full h-full flex flex-col gap-4" ]
         [ div [ class "flex justify-center items-center relative" ]
@@ -848,7 +863,7 @@ gameView game maybeDragData =
                 , ul [ class "grid grid-cols-2 lg:grid-cols-5 gap-4 min-h-[48px]", style "direction" "rtl" ]
                     (List.indexedMap renderAnswer game.answers)
                 , div [ class "w-600px max-w-[600px]" ]
-                    [ thinkingSvg
+                    [ img [ src thinkingImgSrc, class "w-full" ] []
                     ]
                 ]
 
