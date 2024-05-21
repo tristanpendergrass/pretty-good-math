@@ -150,7 +150,7 @@ additionBigStats =
             addendGenerator =
                 Random.int config.addendBigLowerBound config.addendBigUpperBound
         in
-        Random.map2 Addition addendGenerator addendGenerator
+        Random.map2 AdditionBig addendGenerator addendGenerator
     }
 
 

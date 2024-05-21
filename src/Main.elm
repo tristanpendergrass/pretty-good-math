@@ -465,9 +465,11 @@ proseClass =
     class "prose prose-sm md:prose-base"
 
 
-renderGrade : String -> Html msg
-renderGrade grade =
-    strong [ class "underline border rounded border-black p-2" ] [ text grade ]
+renderGrade : String -> List (Attribute Msg) -> Html Msg
+renderGrade grade classes =
+    strong
+        (List.concat [ classes, [ class "underline border rounded border-black p-2" ] ])
+        [ text grade ]
 
 
 scoreToGrade : Int -> String
@@ -517,6 +519,16 @@ canStartGame highScores gameType =
             True
 
 
+isPassing : HighScores -> Game.GameType -> Bool
+isPassing highScores gameType =
+    case getHighScore highScores gameType of
+        Just score ->
+            score >= config.grades.b
+
+        Nothing ->
+            False
+
+
 mainMenuView : Model -> Html Msg
 mainMenuView model =
     let
@@ -528,76 +540,88 @@ mainMenuView model =
         canStartSelectedType =
             canStartGame model.highScores model.gameType
     in
-    div [ class "w-full h-full flex flex-col gap-4 lg:gap-12 items-center" ]
-        [ div [ proseClass ]
-            [ h1 [ class "flex items-center text-2xl" ]
-                [ span [ class "font-bold" ] [ text "Pretty Good Math v3" ]
+    div [ class "w-full h-full flex gap-4 justify-center" ]
+        [ div [ class "flex flex-col gap-4 lg:gap-4 items-center" ]
+            [ div [ proseClass ]
+                [ h1 [ class "flex items-center text-2xl" ]
+                    [ span [ class "font-bold" ] [ text "Pretty Good Math" ]
+                    ]
+                , p []
+                    [ text "Welcome to Pretty Good Math, this is your final exam!"
+                    ]
+                , ol []
+                    [ li [] [ text "Drag and drop ", strong [] [ text "answers" ], text " onto ", strong [] [ text "questions" ] ]
+                    , li [] [ text "Remember that math isn't about being perfect! ", prettyGood, text " is good enough :)" ]
+                    , li [] [ text "Click ", span [ class "badge" ] [ text "Next Sheet" ], text " when you're ready for the next page of problems" ]
+                    ]
+                , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
                 ]
-            , p []
-                [ text "Welcome to Pretty Good Math, this is your final exam!"
-                ]
-            , ol []
-                [ li [] [ text "Drag and drop ", strong [] [ text "answers" ], text " onto ", strong [] [ text "questions" ] ]
-                , li [] [ text "Remember that math isn't about being perfect! ", prettyGood, text " is good enough :)" ]
-                , li [] [ text "Click ", span [ class "badge" ] [ text "Next Sheet" ], text " when you're ready for the next page of problems" ]
-                ]
-            , p [] [ text "You have ", strong [] [ text "1 minute" ], text " to answer as many questions as you can. Good luck!" ]
-            ]
-        , div [ class "flex items-center gap-4" ]
-            (Game.gameTypes
-                |> List.map
-                    (\gt ->
-                        let
-                            questionTypeStats : Math.QuestionTypeStats
-                            questionTypeStats =
-                                Game.getStats gt
+            , div [ class "flex items-center gap-4" ]
+                (Game.gameTypes
+                    |> List.map
+                        (\gt ->
+                            let
+                                questionTypeStats : Math.QuestionTypeStats
+                                questionTypeStats =
+                                    Game.getStats gt
 
-                            maybeHighGrade : Maybe String
-                            maybeHighGrade =
-                                getHighScore model.highScores gt
-                                    |> Maybe.map scoreToGrade
+                                maybeHighGrade : Maybe String
+                                maybeHighGrade =
+                                    getHighScore model.highScores gt
+                                        |> Maybe.map scoreToGrade
 
-                            canStart : Bool
-                            canStart =
-                                canStartGame model.highScores gt
-                        in
-                        label
-                            [ class "flex items-start gap-1 cursor-pointer"
-                            , Pointer.onDown (\_ -> HandleGameTypeClick gt)
-                            ]
-                            [ div [ class "flex flex-col items-center gap-1" ]
-                                [ span [] [ text questionTypeStats.title ]
-                                , div [ class "p-2", classList [ ( "invisible", canStart ) ] ] [ FeatherIcons.lock |> FeatherIcons.withSize 24 |> FeatherIcons.toHtml [] ]
-                                , case maybeHighGrade of
-                                    Nothing ->
-                                        div [ class "p-2 invisible" ] [ renderGrade "D" ]
-
-                                    Just highGrade ->
-                                        renderGrade highGrade
+                                canStart : Bool
+                                canStart =
+                                    canStartGame model.highScores gt
+                            in
+                            label
+                                [ class "flex items-start gap-1 cursor-pointer"
+                                , Pointer.onDown (\_ -> HandleGameTypeClick gt)
                                 ]
-                            , input
-                                [ type_ "radio"
-                                , class "radio"
-                                , checked (model.gameType == gt)
+                                [ div [ class "flex flex-col items-center gap-1" ]
+                                    [ span [] [ text questionTypeStats.title ]
+                                    , div [ class "p-2", classList [ ( "invisible", canStart ) ] ] [ FeatherIcons.lock |> FeatherIcons.withSize 24 |> FeatherIcons.toHtml [] ]
+                                    , case maybeHighGrade of
+                                        Nothing ->
+                                            div [ class "p-2 invisible" ] [ renderGrade "D" [] ]
+
+                                        Just highGrade ->
+                                            let
+                                                gradeBgClass : Attribute Msg
+                                                gradeBgClass =
+                                                    if isPassing model.highScores gt then
+                                                        class "bg-success/50 text-success-content p-2 rounded"
+
+                                                    else
+                                                        class "bg-error/50 text-error-content p-2 rounded"
+                                            in
+                                            renderGrade highGrade [ gradeBgClass ]
+                                    ]
+                                , input
+                                    [ type_ "radio"
+                                    , class "radio"
+                                    , checked (model.gameType == gt)
+                                    ]
+                                    []
                                 ]
-                                []
-                            ]
-                    )
-            )
-        , div [ classList [ ( "invisible", canStartSelectedType ) ], class "flex items-center gap-2 h-[42px]" ]
-            [ FeatherIcons.lock
-                |> FeatherIcons.withSize 24
-                |> FeatherIcons.toHtml []
-            , text "Earn"
-            , renderGrade "B"
-            , text "or higher in the previous test to play"
+                        )
+                )
+            , div [ classList [ ( "invisible", canStartSelectedType ) ], class "flex items-center gap-2 h-[42px]" ]
+                [ FeatherIcons.lock
+                    |> FeatherIcons.withSize 24
+                    |> FeatherIcons.toHtml []
+                , text "Earn"
+                , renderGrade "B" []
+                , text "or higher in the previous test to play"
+                ]
+            , button
+                [ class "btn btn-primary px-16 disabled:cursor-not-allowed"
+                , onClick HandleStartGameClick
+                , disabled (not (canStartGame model.highScores model.gameType))
+                ]
+                [ text "Start!" ]
             ]
-        , button
-            [ class "btn btn-primary px-16 disabled:cursor-not-allowed"
-            , onClick HandleStartGameClick
-            , disabled (not (canStartGame model.highScores model.gameType))
-            ]
-            [ text "Start!" ]
+        , div [ class "w-96 h-96" ] [ img [ src "math.png", class "w-full h-full object-cover" ] [] ]
         ]
 
 
@@ -689,7 +713,7 @@ gameView game maybeDragData =
             let
                 rowStyles : Attribute Msg
                 rowStyles =
-                    class "w-full h-14 flex items-center px-8"
+                    class "w-full h-16 flex items-center px-8"
             in
             case questionAnswer of
                 Game.Unanswered question ->
@@ -807,7 +831,7 @@ gameView game maybeDragData =
 
         sheetStyles : Attribute Msg
         sheetStyles =
-            class "w-[355px] h-[440px] bg-base-100 absolute shadow-xl bg-base-100 border border-gray-500"
+            class "w-[400px] h-[540px] bg-base-100 absolute shadow-xl bg-base-100 border border-gray-500"
 
         placeholderSheet : Int -> Html Msg
         placeholderSheet index =
@@ -878,16 +902,17 @@ gameView game maybeDragData =
         ]
 
 
+playerWon : Game.GameSummary -> Bool
+playerWon gameSummary =
+    gameSummary.finalScore >= config.grades.b
+
+
 gameOverView : Game.GameType -> CompletedGame -> Html Msg
 gameOverView gameType completedGame =
     let
         gameSummary : Game.GameSummary
         gameSummary =
             Game.gameSummary completedGame
-
-        playerWon : Bool
-        playerWon =
-            gameSummary.finalScore >= config.grades.b
 
         questionTypeStats : Math.QuestionTypeStats
         questionTypeStats =
@@ -905,11 +930,11 @@ gameOverView gameType completedGame =
                 , strong [] [ text (String.fromInt config.grades.a) ]
                 , text " points"
                 ]
-            , if playerWon then
-                div [ class "bg-success/50 text-success-content p-8 rounded border-2 border-success animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) ]
+            , if playerWon gameSummary then
+                div [ class "bg-success/50 text-success-content p-8 rounded border-2 border-success animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) [] ]
 
               else
-                div [ class "bg-error/50 text-success-error p-8 rounded border-2 border-error animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) ]
+                div [ class "bg-error/50 text-success-error p-8 rounded border-2 border-error animate-popWiggle" ] [ text "Result: ", renderGrade (scoreToGrade gameSummary.finalScore) [] ]
             , div [ class "w-full flex justify-center items-center" ] [ button [ class "btn btn-primary", onClick HandleMainMenuClick ] [ text "Main Menu" ] ]
             ]
         ]

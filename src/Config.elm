@@ -72,4 +72,6 @@ prodConfig =
 
 devConfig : Config
 devConfig =
-    prodConfig
+    { prodConfig
+        | roundDuration = 60 * 1000
+    }
