@@ -220,11 +220,13 @@ update msg model =
                                 gameSummary =
                                     Game.gameSummary completedGame
 
-                                highScores : HighScores
-                                highScores =
-                                    model.highScores
+                                newHighScores : HighScores
+                                newHighScores =
+                                    updateHighScores model.gameType gameSummary.finalScore model.highScores
                             in
-                            ( { model | gameState = GameOver completedGame }, saveHighScores (updateHighScores model.gameType gameSummary.finalScore highScores) )
+                            ( { model | gameState = GameOver completedGame, highScores = newHighScores }
+                            , saveHighScores newHighScores
+                            )
 
                 _ ->
                     noOp
