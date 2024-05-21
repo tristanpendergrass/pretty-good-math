@@ -41,7 +41,7 @@ type alias Config =
 
 prodConfig : Config
 prodConfig =
-    { roundDuration = 10 * 1000
+    { roundDuration = 60 * 1000
     , addendLowerBound = 1
     , addendUpperBound = 10
     , addendBigLowerBound = 10
